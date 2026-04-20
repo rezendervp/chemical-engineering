@@ -222,10 +222,12 @@ with col_plot:
         ax.text(val, -0.04, lbl, ha="center", va="top",
                 color=cor, fontsize=8)
 
-    ax.legend(loc="lower right", fontsize=8, framealpha=0.9)
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.12),
+              ncol=3, fontsize=8, framealpha=0.9)
     ax.set_xlim(0, 1)
     ax.set_ylim(-0.07, 1.0)
     plt.tight_layout()
+    plt.subplots_adjust(bottom=0.22)
     st.pyplot(fig)
 
 # ══════════════════════════════════════════════════════════
