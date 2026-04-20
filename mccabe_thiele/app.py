@@ -2,15 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import streamlit as st
 
-# ══════════════════════════════════════════════════════════
-#  Configuração da página
-# ══════════════════════════════════════════════════════════
-st.set_page_config(
-    page_title="McCabe-Thiele",
-    page_icon="⚗️",
-    layout="wide",
-)
-
+st.set_page_config(page_title="McCabe-Thiele", page_icon="⚗️", layout="wide")
 st.title("⚗️ Diagrama de McCabe-Thiele")
 st.markdown("Método gráfico para determinação de estágios teóricos em colunas de destilação.")
 
@@ -25,10 +17,16 @@ def x_eq(y, alpha):
     return y / (alpha - (alpha - 1.0) * y)
 
 def intersect_q_rect(R, xD, zF, q):
-    """Interseção linha q com linha de retificação — limite exato da retificação."""
+    """
+    Interseção linha q ∩ linha de retificação.
+    Este ponto (xi, yi) é onde a retificação termina e o esgotamento começa.
+    A linha q vai de (zF, zF) até (xi, yi) — podendo ser extrapolada além.
+    Prova que a linha q passa por (zF, zF):
+      y_q(zF) = [q/(q-1)]*zF - zF/(q-1) = zF*(q-1)/(q-1) = zF  ✓
+    """
     mR = R / (R + 1.0)
     bR = xD / (R + 1.0)
-    if abs(q - 1.0) < 1e-6:
+    if abs(q - 1.0) < 1e-6:      # líquido saturado: linha q vertical x=zF
         xi = zF
         yi = mR * zF + bR
     else:
@@ -39,44 +37,26 @@ def intersect_q_rect(R, xD, zF, q):
     return xi, yi
 
 def pinch_point(alpha, zF, q):
-    """
-    Pinch = interseção da linha q com a curva de equilíbrio.
-
-    Casos especiais:
-      q = 1 (líq. saturado) → linha q vertical x = zF
-      q = 0 (vap. saturado) → linha q horizontal y = zF
-
-    Caso geral: resolve a quadrática resultante de igualar y_q = y_eq
-    e seleciona a raiz fisicamente correta pelo menor resíduo |y_eq - y_q|,
-    garantindo funcionamento correto para q < 1 e q > 1.
-    """
-    if abs(q - 1.0) < 1e-6:                  # líquido saturado
+    """Interseção da linha q com a curva de equilíbrio — usado só para Rmin."""
+    if abs(q - 1.0) < 1e-6:
         return zF, y_eq(zF, alpha)
-
-    if abs(q) < 1e-6:                         # vapor saturado: y_q = zF (horizontal)
+    if abs(q) < 1e-6:
         xp = float(np.clip(x_eq(zF, alpha), 0.0, 1.0))
         return xp, zF
-
     mQ = q / (q - 1.0)
     bQ = -zF / (q - 1.0)
-
-    # Iguala y_eq = y_q → quadrática em x:
-    # (alpha-1)*mQ*x² + (mQ - (alpha-1)*bQ - 1)*x - bQ = 0
     a = alpha - 1.0
     A = a * mQ
     B = mQ - a * bQ - 1.0
     C = -bQ
     disc = B**2 - 4*A*C
-
     if disc < 0:
         return zF, y_eq(zF, alpha)
-
-    if abs(A) < 1e-12:                        # degenerou em linear
+    if abs(A) < 1e-12:
         xp = -C / B if abs(B) > 1e-12 else zF
     else:
         x1 = (-B + np.sqrt(disc)) / (2*A)
         x2 = (-B - np.sqrt(disc)) / (2*A)
-        # seleciona raiz com menor resíduo |y_eq - y_q| dentro de [0,1]
         best, best_res = zF, 1e10
         for xc in [x1, x2]:
             if 0.0 <= xc <= 1.0:
@@ -85,32 +65,20 @@ def pinch_point(alpha, zF, q):
                     best_res = res
                     best = xc
         xp = best
-
-    xp = float(np.clip(xp, 0.0, 1.0))
-    return xp, y_eq(xp, alpha)
+    return float(np.clip(xp, 0.0, 1.0)), y_eq(float(np.clip(xp, 0.0, 1.0)), alpha)
 
 def calc_rmin(alpha, xD, zF, q):
-    """R_min = (xD - yp) / (yp - xp), onde (xp,yp) é o ponto de pinch."""
     xp, yp = pinch_point(alpha, zF, q)
     if abs(yp - xp) < 1e-12:
         return float('inf')
     return max(0.0, (xD - yp) / (yp - xp))
 
 def build_stages(alpha, R, xD, xB, zF, q):
-    """
-    Escada de McCabe-Thiele:
-    1. Parte de (xD, xD) na diagonal.
-    2. Horizontal (y fixo) → x* na curva de equilíbrio.
-    3. Vertical (x fixo)   → desce até a linha de operação ativa.
-    4. Troca para esgotamento quando x* <= xi.
-    5. Repete até x* <= xB.
-    """
     mR = R / (R + 1.0)
     bR = xD / (R + 1.0)
     xi, yi = intersect_q_rect(R, xD, zF, q)
     xi = float(np.clip(xi, xB, xD))
     yi = float(np.clip(yi, xB, xD))
-
     if abs(xi - xB) < 1e-10:
         mS, bS = 1e6, 0.0
     else:
@@ -121,10 +89,10 @@ def build_stages(alpha, R, xD, xB, zF, q):
         return mR * x + bR if use_rect else mS * x + bS
 
     pts = [(xD, xD)]
-    use_rect   = True
+    use_rect = True
     feed_stage = -1
-    stage      = 0
-    y_cur      = xD
+    stage = 0
+    y_cur = xD
 
     while stage < 100:
         x_star = float(np.clip(x_eq(y_cur, alpha), 0.0, 1.0))
@@ -147,7 +115,7 @@ def build_stages(alpha, R, xD, xB, zF, q):
     return pts, stage, feed_stage
 
 # ══════════════════════════════════════════════════════════
-#  Sidebar — sliders
+#  Sidebar
 # ══════════════════════════════════════════════════════════
 
 st.sidebar.header("Parâmetros")
@@ -171,15 +139,13 @@ st.sidebar.markdown("""
 #  Cálculos
 # ══════════════════════════════════════════════════════════
 
-Rmin   = calc_rmin(alpha, xD, zF, q)
-ratio  = R / Rmin if Rmin > 0 and Rmin != float('inf') else float('inf')
-xp, yp = pinch_point(alpha, zF, q)
+Rmin  = calc_rmin(alpha, xD, zF, q)
+ratio = R / Rmin if Rmin not in (0, float('inf')) else float('inf')
 xi, yi = intersect_q_rect(R, xD, zF, q)
 xi = float(np.clip(xi, xB, xD))
 yi = float(np.clip(yi, 0.0, 1.0))
 pts, n_stages, feed_stage = build_stages(alpha, R, xD, xB, zF, q)
 
-# ── Métricas no topo ────────────────────────────────────
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Estágios teóricos",   n_stages)
 col2.metric("Estágio alimentação", feed_stage)
@@ -187,7 +153,7 @@ col3.metric("R_min",               f"{Rmin:.3f}" if Rmin != float('inf') else "�
 col4.metric("R / R_min",           f"{ratio:.2f}" if ratio != float('inf') else "∞")
 
 # ══════════════════════════════════════════════════════════
-#  Plot — coluna centralizada
+#  Plot
 # ══════════════════════════════════════════════════════════
 
 _, col_plot, _ = st.columns([1, 2, 1])
@@ -202,48 +168,51 @@ with col_plot:
 
     x_arr = np.linspace(0, 1, 500)
 
-    # Diagonal
+    # ── Diagonal y = x ──────────────────────────────────────
     ax.plot(x_arr, x_arr, color="gray", lw=1, linestyle="--",
             label="Diagonal  y = x", zorder=1)
 
-    # Curva de equilíbrio
+    # ── Curva de equilíbrio ─────────────────────────────────
     ax.plot(x_arr, y_eq(x_arr, alpha), color="#3a8fd1", lw=2.5,
             label=f"Equilíbrio  (α = {alpha:.2f})", zorder=2)
 
-    # Linha de retificação: de (xi,yi) até (xD,xD)
+    # ── Linha de retificação: (xi,yi) → (xD,xD) ────────────
     ax.plot([xi, xD], [yi, xD], color="#e05c2a", lw=2,
             label=f"Retificação  (R = {R:.2f})", zorder=3)
 
-    # Linha de esgotamento: de (xB,xB) até (xi,yi)
+    # ── Linha de esgotamento: (xB,xB) → (xi,yi) ───────────
     ax.plot([xB, xi], [xB, yi], color="#1a9e6e", lw=2,
             label="Esgotamento", zorder=3)
 
-    # Linha q — do eixo x até o ponto de pinch
+    # ── Linha q: parte de (zF,zF) na diagonal,
+    #    termina em (xi,yi) extrapolada 20% além para didática ──
     if abs(q - 1.0) < 1e-6:
-        ax.plot([zF, zF], [0.0, yp], color="#c04ab0", lw=1.8,
-                linestyle="-.", label=f"Linha q  (q = {q:.2f})", zorder=2)
-    elif abs(q) < 1e-6:
-        ax.plot([0.0, xp], [zF, zF], color="#c04ab0", lw=1.8,
+        # líquido saturado: vertical de (zF,zF) até (zF, yi) + 20% extra
+        y_extra = yi + 0.20 * (yi - zF)
+        y_extra = float(np.clip(y_extra, 0.0, 1.0))
+        ax.plot([zF, zF], [zF, y_extra], color="#c04ab0", lw=1.8,
                 linestyle="-.", label=f"Linha q  (q = {q:.2f})", zorder=2)
     else:
-        mQ = q / (q - 1.0)
-        bQ = -zF / (q - 1.0)
-        x_q0 = float(np.clip(-bQ / mQ if abs(mQ) > 1e-10 else zF, 0.0, 1.0))
-        y_q0 = mQ * x_q0 + bQ
-        ax.plot([x_q0, xp], [y_q0, yp], color="#c04ab0", lw=1.8,
+        # caso geral: de (zF,zF) até (xi,yi) + 20% de extrapolação
+        dx = xi - zF
+        dy = yi - zF
+        x_extra = xi + 0.20 * dx
+        y_extra = yi + 0.20 * dy
+        x_extra = float(np.clip(x_extra, 0.0, 1.0))
+        y_extra = float(np.clip(y_extra, 0.0, 1.0))
+        ax.plot([zF, x_extra], [zF, y_extra], color="#c04ab0", lw=1.8,
                 linestyle="-.", label=f"Linha q  (q = {q:.2f})", zorder=2)
 
-    # Ponto de pinch
-    ax.plot(xp, yp, "o", color="#c04ab0", ms=7, zorder=5,
-            label=f"Pinch  ({xp:.3f}, {yp:.3f})")
+    # ── Ponto de interseção das linhas de operação ──────────
+    ax.plot(xi, yi, "o", color="#888", ms=6, zorder=5)
 
-    # Estágios (escada)
+    # ── Estágios (escada) ────────────────────────────────────
     xs = [p[0] for p in pts]
     ys = [p[1] for p in pts]
     ax.plot(xs, ys, color="#f0b429", lw=2.5,
             label=f"Estágios ({n_stages} teóricos)", zorder=4)
 
-    # Verticais tracejadas em xB, zF, xD — de y=0 até a diagonal (y=x)
+    # ── Verticais tracejadas: xB, zF, xD → de y=0 até diagonal ─
     for val, cor, lbl in [
             (xB, "#1a9e6e", f"xB={xB:.2f}"),
             (zF, "#c04ab0", f"zF={zF:.2f}"),
