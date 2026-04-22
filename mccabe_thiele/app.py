@@ -151,7 +151,7 @@ st.sidebar.header("Parâmetros Operacionais")
 xD = st.sidebar.slider("xD — destilado",    0.50, 0.99, 0.90, 0.01)
 xB = st.sidebar.slider("xB — fundo",        0.01, 0.40, 0.05, 0.01)
 zF = st.sidebar.slider("zF — alimentação",  0.10, 0.90, 0.45, 0.01)
-q  = st.sidebar.slider("q — qualidade da alimentação", -1.0, 2.0, 1.0, 0.05)
+q  = st.sidebar.slider("q — qualidade da alimentação", -2.0, 2.0, 1.0, 0.02)
 
 st.sidebar.markdown("""
 **Parâmetro q:**
@@ -228,10 +228,10 @@ st.sidebar.markdown(f"**R_min calculado: `{Rmin:.3f}`**")
 
 if Rmin == float('inf') or Rmin > 50:
     st.sidebar.warning("R_min muito alto ou indefinido. Verifique os parâmetros.")
-    razao_R = st.sidebar.slider("R / R_min", 1.05, 5.0, 1.5, 0.05, disabled=True)
+    razao_R = st.sidebar.slider("R / R_min", 0.90, 5.0, 1.5, 0.05, disabled=True)
     R = 2.0
 else:
-    razao_R = st.sidebar.slider("R / R_min", 1.05, 5.0, 1.5, 0.05)
+    razao_R = st.sidebar.slider("R / R_min", 0.90, 5.0, 1.5, 0.05)
     R = razao_R * Rmin
 
 st.sidebar.markdown(f"**R resultante: `{R:.3f}`**")
