@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-RSM–KRIGING ANALYSIS SUITE — STREAMLIT APP
-============================================
-Universidade Estadual de Maringá (UEM)
-Departamento de Engenharia Química / 3DCP Lab
+RSM-KRIGING ANALYSIS SUITE - STREAMLIT APP v3.1
+Universidade Estadual de Maringá (UEM) - Eng. Química / 3DCP Lab
+Prof. Dr. Ricardo V. P. Rezende | Doutoranda Allana Ribeiro Mendes
 
-Prof. Dr. Ricardo V. P. Rezende
-Doutoranda Allana Ribeiro Mendes
-
-Versão Streamlit com gráficos 3D interativos (Plotly)
+Correções v3.1:
+  - .applymap() -> .map()  (pandas >= 2.1)
+  - Contornos com aspecto quadrado (scaleanchor)
+  - Abas de métricas/análise/veredicto sempre renderizadas
+  - Dataset: 26 casos | Fatores: hn, r1
 """
 
 import streamlit as st
@@ -18,7 +18,6 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 import io
-import base64
 
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
@@ -29,938 +28,558 @@ from sklearn.gaussian_process.kernels import (
     ConstantKernel, Matern, WhiteKernel, RBF, RationalQuadratic
 )
 
-# ──────────────────────────────────────────────
-# CONFIGURAÇÃO DA PÁGINA
-# ──────────────────────────────────────────────
-st.set_page_config(
-    page_title="RSM–Kriging Suite | UEM",
-    page_icon="🔬",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="RSM-Kriging Suite | UEM", page_icon="🔬",
+                   layout="wide", initial_sidebar_state="expanded")
 
-# ──────────────────────────────────────────────
-# CSS PERSONALIZADO
-# ──────────────────────────────────────────────
 st.markdown("""
 <style>
-    /* Fundo e tipografia */
-    html, body, [class*="css"] { font-family: 'Segoe UI', sans-serif; }
-
-    /* Header principal */
-    .main-header {
-        background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #1565c0 100%);
-        padding: 1.6rem 2rem;
-        border-radius: 12px;
-        margin-bottom: 1.5rem;
-        color: white;
-        box-shadow: 0 4px 20px rgba(26,35,126,0.3);
-    }
-    .main-header h1 { margin: 0; font-size: 1.9rem; font-weight: 700; }
-    .main-header p  { margin: 0.3rem 0 0; opacity: 0.85; font-size: 0.9rem; }
-
-    /* Cards de métricas */
-    .metric-card {
-        background: white;
-        border-radius: 10px;
-        padding: 1rem 1.2rem;
-        border-left: 5px solid #1565c0;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        margin-bottom: 0.6rem;
-    }
-    .metric-card.green  { border-left-color: #2e7d32; }
-    .metric-card.orange { border-left-color: #e65100; }
-    .metric-card.red    { border-left-color: #c62828; }
-
-    /* Verdict box */
-    .verdict-box {
-        border-radius: 12px;
-        padding: 1.4rem;
-        font-size: 1rem;
-        font-weight: 500;
-        margin-top: 0.8rem;
-    }
-    .verdict-kriging { background:#e8f5e9; border:2px solid #2e7d32; color:#1b5e20; }
-    .verdict-rsm     { background:#e3f2fd; border:2px solid #1565c0; color:#0d47a1; }
-
-    /* Abas */
-    .stTabs [data-baseweb="tab-list"] { gap: 8px; }
-    .stTabs [data-baseweb="tab"] {
-        background: #f0f4f8;
-        border-radius: 8px 8px 0 0;
-        padding: 0.5rem 1.2rem;
-        font-weight: 600;
-    }
-    .stTabs [aria-selected="true"] {
-        background: #1565c0 !important;
-        color: white !important;
-    }
-
-    /* Tabelas */
-    .stDataFrame { border-radius: 8px; overflow: hidden; }
-
-    /* Sidebar */
-    .css-1d391kg { background-color: #f8fafc; }
-    .sidebar-section {
-        background: white;
-        border-radius: 10px;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.07);
-    }
-    .sidebar-section h4 { color: #1565c0; margin: 0 0 0.7rem; font-size: 0.9rem; }
-
-    /* Botão executar */
-    .stButton > button {
-        background: linear-gradient(90deg, #1565c0, #283593);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 0.6rem 1.4rem;
-        font-weight: 600;
-        font-size: 1rem;
-        width: 100%;
-        transition: 0.2s;
-    }
-    .stButton > button:hover { opacity: 0.88; transform: translateY(-1px); }
-
-    /* Info box */
-    .info-block {
-        background: #e3f2fd;
-        border-radius: 8px;
-        padding: 0.9rem 1.1rem;
-        border-left: 4px solid #1565c0;
-        font-size: 0.88rem;
-        color: #0d47a1;
-        margin-bottom: 1rem;
-    }
+html,body,[class*="css"]{font-family:'Segoe UI',sans-serif;}
+.main-header{background:linear-gradient(135deg,#1a237e,#1565c0);padding:1.5rem 2rem;
+  border-radius:12px;margin-bottom:1.4rem;color:white;box-shadow:0 4px 20px rgba(26,35,126,.3);}
+.main-header h1{margin:0;font-size:1.85rem;font-weight:700;}
+.main-header p{margin:.3rem 0 0;opacity:.85;font-size:.88rem;}
+.verdict-box{border-radius:12px;padding:1.3rem;font-size:.97rem;font-weight:500;
+  margin-top:.8rem;line-height:1.75;}
+.verdict-kriging{background:#e8f5e9;border:2px solid #2e7d32;color:#1b5e20;}
+.verdict-rsm{background:#e3f2fd;border:2px solid #1565c0;color:#0d47a1;}
+.stTabs [data-baseweb="tab-list"]{gap:6px;}
+.stTabs [data-baseweb="tab"]{background:#f0f4f8;border-radius:8px 8px 0 0;
+  padding:.45rem 1.1rem;font-weight:600;}
+.stTabs [aria-selected="true"]{background:#1565c0!important;color:white!important;}
+.stButton>button{background:linear-gradient(90deg,#1565c0,#283593);color:white;
+  border:none;border-radius:8px;padding:.6rem 1.4rem;font-weight:600;font-size:1rem;width:100%;}
 </style>
 """, unsafe_allow_html=True)
 
-# ──────────────────────────────────────────────
-# FUNÇÕES ANALÍTICAS
-# ──────────────────────────────────────────────
+# ── Constantes ────────────────────────────────────────────────────────────────
+EXCLUIR  = ["caso","hn","v","u","r1","r2","regime","estabilidade"]
+KERNELS  = ["Matern 5/2","Matern 3/2","RBF","Rational Quadratic"]
+UNIDADES = {"largura":"mm","altura":"mm","area":"mm²","ar":"mm²",
+            "area_norm":"—","perda_alt":"mm","espalhamento":"mm"}
+
+# ── Funções analíticas ────────────────────────────────────────────────────────
 
 def montar_kernel(nome):
-    base = {"Matern 3/2": Matern(nu=1.5), "Matern 5/2": Matern(nu=2.5),
-            "RBF": RBF(), "Rational Quadratic": RationalQuadratic()}[nome]
-    return ConstantKernel(1.0) * base + WhiteKernel(noise_level=1e-3)
+    B = {"Matern 3/2":Matern(nu=1.5),"Matern 5/2":Matern(nu=2.5),
+         "RBF":RBF(),"Rational Quadratic":RationalQuadratic()}[nome]
+    return ConstantKernel(1.0)*B + WhiteKernel(noise_level=1e-3)
 
 
-def calcular_metricas(y, y_pred, nome="Modelo", p=None):
-    y, y_pred = np.asarray(y, float), np.asarray(y_pred, float)
-    resid = y - y_pred
-    n = len(y)
-    rmse = np.sqrt(mean_squared_error(y, y_pred))
-    mae  = mean_absolute_error(y, y_pred)
-    bias = np.mean(resid)
-    max_abs = np.max(np.abs(resid))
-    mape = np.mean(np.abs(resid) / np.maximum(np.abs(y), 1e-12)) * 100
-    sse = np.sum(resid**2)
-    sst = np.sum((y - np.mean(y))**2)
-    r2  = 1 - sse/sst if sst > 0 else np.nan
-    press = sse
-    q2    = 1 - press/sst if sst > 0 else np.nan
-    if p and n > p+1 and sse > 0:
-        aic = n*np.log(sse/n) + 2*p
-        bic = n*np.log(sse/n) + p*np.log(n)
-    else:
-        aic = bic = np.nan
-    return {"Modelo": nome, "R²": r2, "RMSE": rmse, "MAE": mae,
-            "MAPE (%)": mape, "Bias": bias, "Erro abs máx": max_abs,
-            "PRESS": press, "Q²": q2, "AIC": aic, "BIC": bic}
+def metricas(y,yp,nome,p=None):
+    y,yp = np.asarray(y,float),np.asarray(yp,float)
+    res=y-yp; sse=np.sum(res**2); sst=np.sum((y-np.mean(y))**2)
+    r2=1-sse/sst if sst>0 else np.nan
+    rm=float(np.sqrt(mean_squared_error(y,yp)))
+    aic=bic=np.nan
+    n=len(y)
+    if p and n>p+1 and sse>0:
+        aic=n*np.log(sse/n)+2*p; bic=n*np.log(sse/n)+p*np.log(n)
+    return {"Modelo":nome,"R²":r2,"RMSE":rm,
+            "MAE":mean_absolute_error(y,yp),
+            "MAPE (%)":np.mean(np.abs(res)/np.maximum(np.abs(y),1e-12))*100,
+            "Bias":float(np.mean(res)),"Erro abs máx":float(np.max(np.abs(res))),
+            "PRESS":float(sse),"Q²":r2,"AIC":aic,"BIC":bic}
 
 
-def gradiente_rsm(beta, hn, r1):
-    return np.array([beta[1] + beta[3]*r1 + 2*beta[4]*hn,
-                     beta[2] + beta[3]*hn + 2*beta[5]*r1])
-
-
-def hessiana_rsm(beta):
-    return np.array([[2*beta[4], beta[3]], [beta[3], 2*beta[5]]])
-
-
-def classificar_regiao_local(diff_abs, diff_rel, sigma, faixa_y):
-    sigma = max(sigma, 1e-12)
-    razao_sigma = diff_abs / sigma
-    frac_faixa  = diff_abs / max(faixa_y, 1e-12)
-    if   razao_sigma < 1 and frac_faixa < 0.03: return "✅ Excelente concordância local"
-    elif razao_sigma < 2 and frac_faixa < 0.07: return "🟢 Boa concordância local"
-    elif razao_sigma < 3 or  frac_faixa < 0.12: return "🟡 Concordância moderada / atenção"
-    else: return "🔴 Conflito relevante entre os modelos"
-
-
-def analisar_ponto_local(hn_novo, r1_novo, beta, gpr, scaler_X, X_exp, y, HN, R):
-    y_rsm = (beta[0] + beta[1]*hn_novo + beta[2]*r1_novo +
-             beta[3]*hn_novo*r1_novo + beta[4]*hn_novo**2 + beta[5]*r1_novo**2)
-    grad    = gradiente_rsm(beta, hn_novo, r1_novo)
-    H       = hessiana_rsm(beta)
-    eigvals = np.linalg.eigvals(H)
-    X_novo_scaled = scaler_X.transform([[hn_novo, r1_novo]])
-    y_krig, sigma = gpr.predict(X_novo_scaled, return_std=True)
-    y_krig = y_krig[0]; sigma = sigma[0]
-    distancias = np.sqrt((HN - hn_novo)**2 + (R - r1_novo)**2)
-    dmin    = np.min(distancias)
-    idx_min = np.argmin(distancias)
-    diff_abs = abs(y_krig - y_rsm)
-    diff_rel = 100*diff_abs / max(abs(y_krig), 1e-12)
-    faixa_y  = np.max(y) - np.min(y)
-    z_rel    = sigma / max(faixa_y, 1e-12)
-    return {
-        "HN": hn_novo, "r1": r1_novo,
-        "RSM_pred": y_rsm, "Krig_pred": y_krig, "Krig_sigma": sigma,
-        "IC_inf_95": y_krig - 1.96*sigma, "IC_sup_95": y_krig + 1.96*sigma,
-        "Diff_abs": diff_abs, "Diff_rel_%": diff_rel,
-        "Razao_diff_sigma": diff_abs/max(sigma,1e-12),
-        "Sigma_rel_faixa_%": 100*z_rel,
-        "Dist_ponto_mais_prox": dmin, "Caso_mais_prox": idx_min,
-        "Grad_dy_dHN": grad[0], "Grad_dy_dr1": grad[1],
-        "Norma_grad": np.linalg.norm(grad),
-        "Curvatura_autovalor_1": eigvals[0], "Curvatura_autovalor_2": eigvals[1],
-        "Interpretação": classificar_regiao_local(diff_abs, diff_rel, sigma, faixa_y)
-    }
+def ponto_local(hn0,r10,beta,gpr,sc,y,HN,R):
+    yr=(beta[0]+beta[1]*hn0+beta[2]*r10+beta[3]*hn0*r10
+        +beta[4]*hn0**2+beta[5]*r10**2)
+    g=np.array([beta[1]+beta[3]*r10+2*beta[4]*hn0,
+                beta[2]+beta[3]*hn0+2*beta[5]*r10])
+    H=np.array([[2*beta[4],beta[3]],[beta[3],2*beta[5]]])
+    ev=np.linalg.eigvals(H)
+    yp,sg=gpr.predict(sc.transform([[hn0,r10]]),return_std=True)
+    yk=float(yp[0]); s=float(sg[0])
+    dist=np.sqrt((HN-hn0)**2+(R-r10)**2)
+    da=abs(yk-yr); dr=100*da/max(abs(yk),1e-12); fy=float(np.max(y)-np.min(y))
+    s_=max(s,1e-12); rs=da/s_; ff=da/max(fy,1e-12)
+    if   rs<1 and ff<0.03: interp="✅ Excelente concordância local"
+    elif rs<2 and ff<0.07: interp="🟢 Boa concordância local"
+    elif rs<3 or  ff<0.12: interp="🟡 Concordância moderada"
+    else:                  interp="🔴 Conflito entre modelos"
+    return {"HN (mm)":round(hn0,4),"r1 (V/U)":round(r10,4),
+            "RSM — Predição":round(yr,6),"Kriging — Predição":round(yk,6),
+            "Kriging — σ":round(s,6),
+            "IC 95% inferior":round(yk-1.96*s,6),"IC 95% superior":round(yk+1.96*s,6),
+            "Diferença abs":round(da,6),"Diferença rel (%)":round(dr,4),
+            "Razão diff/σ":round(da/s_,4),"σ rel faixa (%)":round(100*s/max(fy,1e-12),4),
+            "Dist. mais próximo":round(float(np.min(dist)),4),
+            "Caso mais próximo":int(np.argmin(dist)),
+            "Grad dY/dHN":round(float(g[0]),6),"Grad dY/dr1":round(float(g[1]),6),
+            "Norma grad":round(float(np.linalg.norm(g)),6),
+            "Autovalor H1":round(float(ev[0].real),6),"Autovalor H2":round(float(ev[1].real),6),
+            "Interpretação":interp}
 
 
 @st.cache_data(show_spinner=False)
-def rodar_analise(df_bytes, resposta, kernel_nome, hn_novo, r1_novo):
-    df = pd.read_excel(io.BytesIO(df_bytes))
-    df.columns = df.columns.str.strip()
-    dados = df[["caso", "hn", "r1", resposta]].copy()
-    HN = dados["hn"].values.astype(float)
-    R  = dados["r1"].values.astype(float)
-    y  = dados[resposta].values.astype(float)
+def rodar(df_bytes, resp, kname, hn0, r10):
+    df=pd.read_excel(io.BytesIO(df_bytes)); df.columns=df.columns.str.strip()
+    HN=df["hn"].values.astype(float); R=df["r1"].values.astype(float)
+    y=df[resp].values.astype(float); casos=df["caso"].values
 
     # RSM
-    X_rsm = np.column_stack([np.ones(len(HN)), HN, R, HN*R, HN**2, R**2])
-    model_rsm = LinearRegression(fit_intercept=False)
-    model_rsm.fit(X_rsm, y)
-    beta      = model_rsm.coef_
-    y_pred_rsm = model_rsm.predict(X_rsm)
-
-    # LOOCV RSM
-    loo = LeaveOneOut()
-    y_pred_rsm_cv = np.zeros_like(y, float)
-    for tr, te in loo.split(X_rsm):
-        m = LinearRegression(fit_intercept=False).fit(X_rsm[tr], y[tr])
-        y_pred_rsm_cv[te[0]] = m.predict(X_rsm[te])[0]
+    Xr=np.column_stack([np.ones(len(HN)),HN,R,HN*R,HN**2,R**2])
+    mr=LinearRegression(fit_intercept=False).fit(Xr,y); beta=mr.coef_
+    ypr=mr.predict(Xr); loo=LeaveOneOut()
+    ypr_cv=np.zeros_like(y,float)
+    for tr,te in loo.split(Xr):
+        ypr_cv[te[0]]=LinearRegression(fit_intercept=False).fit(Xr[tr],y[tr]).predict(Xr[te])[0]
 
     # Kriging
-    X_krig = dados[["hn","r1"]].values
-    scaler_X = StandardScaler()
-    X_krig_scaled = scaler_X.fit_transform(X_krig)
-    kernel = montar_kernel(kernel_nome)
-    gpr = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=20,
-                                   normalize_y=True, random_state=42)
-    gpr.fit(X_krig_scaled, y)
-    y_pred_krig, y_std_krig = gpr.predict(X_krig_scaled, return_std=True)
-
-    # LOOCV Kriging
-    y_pred_krig_cv = np.zeros_like(y, float)
-    for tr, te in loo.split(X_krig_scaled):
-        g = GaussianProcessRegressor(kernel=montar_kernel(kernel_nome),
-                                     n_restarts_optimizer=10,
-                                     normalize_y=True, random_state=42)
-        g.fit(X_krig_scaled[tr], y[tr])
-        y_pred_krig_cv[te[0]] = g.predict(X_krig_scaled[te])[0]
+    sc=StandardScaler(); Xs=sc.fit_transform(df[["hn","r1"]].values.astype(float))
+    gpr=GaussianProcessRegressor(kernel=montar_kernel(kname),
+        n_restarts_optimizer=20,normalize_y=True,random_state=42).fit(Xs,y)
+    ypk,ysk=gpr.predict(Xs,return_std=True)
+    ypk_cv=np.zeros_like(y,float)
+    for tr,te in loo.split(Xs):
+        ypk_cv[te[0]]=GaussianProcessRegressor(kernel=montar_kernel(kname),
+            n_restarts_optimizer=10,normalize_y=True,random_state=42).fit(Xs[tr],y[tr]).predict(Xs[te])[0]
 
     # Métricas
-    met = pd.DataFrame([
-        calcular_metricas(y, y_pred_rsm,    "RSM (Treino)",                 p=6),
-        calcular_metricas(y, y_pred_rsm_cv, "RSM (LOOCV)",                  p=6),
-        calcular_metricas(y, y_pred_krig,   f"Kriging ({kernel_nome}) Treino"),
-        calcular_metricas(y, y_pred_krig_cv,f"Kriging ({kernel_nome}) LOOCV"),
-    ])
+    tab_met=pd.DataFrame([metricas(y,ypr,"RSM (Treino)",p=6),
+                          metricas(y,ypr_cv,"RSM (LOOCV)",p=6),
+                          metricas(y,ypk,f"Kriging ({kname}) Treino"),
+                          metricas(y,ypk_cv,f"Kriging ({kname}) LOOCV")])
 
     # Malha
-    margin_hn = 0.10*(HN.max()-HN.min())
-    margin_r1 = 0.10*(R.max()-R.min())
-    hn_range  = np.linspace(HN.min()-margin_hn, HN.max()+margin_hn, 80)
-    r1_range  = np.linspace(R.min()-margin_r1,  R.max()+margin_r1,  80)
-    HN_grid, R_grid = np.meshgrid(hn_range, r1_range)
-
-    Z_rsm = (beta[0] + beta[1]*HN_grid + beta[2]*R_grid +
-             beta[3]*HN_grid*R_grid + beta[4]*HN_grid**2 + beta[5]*R_grid**2)
-
-    X_grid = np.column_stack([HN_grid.ravel(), R_grid.ravel()])
-    Z_krig_pred, Z_krig_std = gpr.predict(scaler_X.transform(X_grid), return_std=True)
-    Z_krig  = Z_krig_pred.reshape(HN_grid.shape)
-    Z_sigma = Z_krig_std.reshape(HN_grid.shape)
-    Z_diff  = Z_krig - Z_rsm
+    m=0.10
+    hg=np.linspace(HN.min()*(1-m),HN.max()*(1+m),80)
+    rg=np.linspace(R.min()*(1-m),R.max()*(1+m),80)
+    HG,RG=np.meshgrid(hg,rg)
+    Zr=beta[0]+beta[1]*HG+beta[2]*RG+beta[3]*HG*RG+beta[4]*HG**2+beta[5]*RG**2
+    Xg=np.column_stack([HG.ravel(),RG.ravel()])
+    Zk_,Zs_=gpr.predict(sc.transform(Xg),return_std=True)
+    Zk=Zk_.reshape(HG.shape); Zs=Zs_.reshape(HG.shape); Zd=Zk-Zr
 
     # Ponto local
-    ponto_local = analisar_ponto_local(
-        hn_novo, r1_novo, beta, gpr, scaler_X, X_krig, y, HN, R)
-    y_rsm_local  = ponto_local["RSM_pred"]
-    y_krig_local = ponto_local["Krig_pred"]
+    pl=ponto_local(hn0,r10,beta,gpr,sc,y,HN,R)
+    yrl=pl["RSM — Predição"]; ykl=pl["Kriging — Predição"]
 
-    # Equação RSM
-    eq_text = (f"y = {beta[0]:.5f} {beta[1]:+.5f}·HN {beta[2]:+.5f}·r1 "
-               f"{beta[3]:+.5f}·HN·r1 {beta[4]:+.5f}·HN² {beta[5]:+.5f}·r1²")
+    # Equação
+    eq=(f"{resp}(HN,r1) = {beta[0]:.5f} {beta[1]:+.5f}·HN"
+        f" {beta[2]:+.5f}·r1 {beta[3]:+.5f}·HN·r1"
+        f" {beta[4]:+.5f}·HN² {beta[5]:+.5f}·r1²")
 
     # Ponto crítico
-    A_mat = np.array([[2*beta[4], beta[3]], [beta[3], 2*beta[5]]])
-    b_vec = np.array([-beta[1], -beta[2]])
     try:
-        pc   = np.linalg.solve(A_mat, b_vec)
-        HN_s, R_s = pc
-        y_s  = (beta[0]+beta[1]*HN_s+beta[2]*R_s+beta[3]*HN_s*R_s+
-                beta[4]*HN_s**2+beta[5]*R_s**2)
-        Hess = np.array([[2*beta[4],beta[3]],[beta[3],2*beta[5]]])
-        ev   = np.linalg.eigvals(Hess)
-        detH = np.linalg.det(Hess)
-        if np.all(ev>0):   cls = "🟢 Mínimo local"
-        elif np.all(ev<0): cls = "🔴 Máximo local"
-        else:              cls = "🟡 Ponto de sela"
-        ponto_critico_df = pd.DataFrame({
-            "Parâmetro": ["HN*","r1*",f"{resposta.capitalize()}(HN*,r1*)",
-                          "Det(H)","Autovalor 1","Autovalor 2","Classificação",
-                          "HN* dentro da faixa?","r1* dentro da faixa?"],
-            "Valor": [HN_s, R_s, y_s, detH, ev[0], ev[1], cls,
-                      HN.min()<=HN_s<=HN.max(), R.min()<=R_s<=R.max()]
-        })
+        A=np.array([[2*beta[4],beta[3]],[beta[3],2*beta[5]]])
+        pc=np.linalg.solve(A,np.array([-beta[1],-beta[2]]))
+        Hs,Rs=pc
+        ys=beta[0]+beta[1]*Hs+beta[2]*Rs+beta[3]*Hs*Rs+beta[4]*Hs**2+beta[5]*Rs**2
+        ev=np.linalg.eigvals(A)
+        if np.all(ev.real>0): cp="🟢 Mínimo local"
+        elif np.all(ev.real<0): cp="🔴 Máximo local"
+        else: cp="🟡 Ponto de sela"
+        pc_df=pd.DataFrame({"Parâmetro":["HN*","r1*",f"{resp}(HN*,r1*)",
+                            "Det(H)","Autovalor 1","Autovalor 2","Classificação",
+                            "HN* na faixa?","r1* na faixa?"],
+                            "Valor":[round(Hs,4),round(Rs,4),round(float(ys),4),
+                            round(float(np.linalg.det(A)),4),round(float(ev[0].real),4),
+                            round(float(ev[1].real),4),cp,
+                            bool(HN.min()<=Hs<=HN.max()),bool(R.min()<=Rs<=R.max())]})
     except Exception:
-        ponto_critico_df = pd.DataFrame({"Parâmetro":["Erro"],"Valor":["Sistema singular"]})
+        pc_df=pd.DataFrame({"Parâmetro":["Erro"],"Valor":["Sistema singular"]})
 
-    # Overfitting + veredicto
-    rmse_rsm_train  = np.sqrt(mean_squared_error(y,y_pred_rsm))
-    rmse_krig_train = np.sqrt(mean_squared_error(y,y_pred_krig))
-    rmse_rsm_cv     = np.sqrt(mean_squared_error(y,y_pred_rsm_cv))
-    rmse_krig_cv    = np.sqrt(mean_squared_error(y,y_pred_krig_cv))
-    r2_rsm_train    = r2_score(y,y_pred_rsm)
-    r2_krig_train   = r2_score(y,y_pred_krig)
-    r2_rsm_cv       = r2_score(y,y_pred_rsm_cv)
-    r2_krig_cv      = r2_score(y,y_pred_krig_cv)
-    delta_r2_rsm    = r2_rsm_train  - r2_rsm_cv
-    delta_r2_krig   = r2_krig_train - r2_krig_cv
-    delta_rmse_rsm  = rmse_rsm_cv  - rmse_rsm_train
-    delta_rmse_krig = rmse_krig_cv - rmse_krig_train
-
-    def classificar_risco(d_r2, d_rmse):
-        if d_r2<0.05 and d_rmse<1.5: return "🟢 Baixo"
-        elif d_r2<0.15 and d_rmse<4: return "🟡 Moderado"
+    # Overfitting
+    def _r(a,b): return float(r2_score(a,b))
+    def _m(a,b): return float(np.sqrt(mean_squared_error(a,b)))
+    r2rt=_r(y,ypr); r2rc=_r(y,ypr_cv); r2kt=_r(y,ypk); r2kc=_r(y,ypk_cv)
+    mrt=_m(y,ypr);  mrc=_m(y,ypr_cv);  mkt=_m(y,ypk);  mkc=_m(y,ypk_cv)
+    def risco(dr2,dr):
+        if dr2<0.05 and dr<1.5: return "🟢 Baixo"
+        elif dr2<0.15 and dr<4: return "🟡 Moderado"
         else: return "🔴 Alto"
+    rr=risco(r2rt-r2rc,mrc-mrt); rk=risco(r2kt-r2kc,mkc-mkt)
+    sr=(2 if mrc<mkc else 0)+(1 if r2rc>r2kc else 0)-(1 if "Alto" in rr else 0)
+    sk=(2 if mkc<=mrc else 0)+(1 if r2kc>=r2rc else 0)-(1 if "Alto" in rk else 0)
+    venc="RSM" if sr>sk else "Kriging"
 
-    risco_rsm  = classificar_risco(delta_r2_rsm,  delta_rmse_rsm)
-    risco_krig = classificar_risco(delta_r2_krig, delta_rmse_krig)
+    of=pd.DataFrame({"Modelo":["RSM",f"Kriging ({kname})"],
+        "R² Treino":[round(r2rt,5),round(r2kt,5)],"R² LOOCV":[round(r2rc,5),round(r2kc,5)],
+        "ΔR²":[round(r2rt-r2rc,5),round(r2kt-r2kc,5)],
+        "RMSE Treino":[round(mrt,5),round(mkt,5)],"RMSE LOOCV":[round(mrc,5),round(mkc,5)],
+        "ΔRMSE":[round(mrc-mrt,5),round(mkc-mkt,5)],
+        "Risco":[rr,rk],"Score":[sr,sk]})
 
-    score_rsm  = (2 if rmse_rsm_cv<rmse_krig_cv else 0) + (1 if r2_rsm_cv>r2_krig_cv else 0)
-    score_krig = (2 if rmse_krig_cv<=rmse_rsm_cv else 0) + (1 if r2_krig_cv>=r2_rsm_cv else 0)
-    if "Alto" in risco_rsm:  score_rsm  -= 1
-    if "Alto" in risco_krig: score_krig -= 1
-    vencedor = "RSM" if score_rsm>score_krig else "Kriging"
+    res_rc=y-ypr_cv; res_kc=y-ypk_cv
+    resultado=pd.DataFrame({"caso":casos,"hn":HN,"r1":R,resp:y,
+        "RSM_treino":ypr,"RSM_LOOCV":ypr_cv,"RSM_res_LOOCV":res_rc,
+        "Krig_treino":ypk,"Krig_σ":ysk,"Krig_LOOCV":ypk_cv,"Krig_res_LOOCV":res_kc})
 
-    df_overfit = pd.DataFrame({
-        "Modelo": ["RSM",f"Kriging ({kernel_nome})"],
-        "ΔR²":   [round(delta_r2_rsm,5),   round(delta_r2_krig,5)],
-        "ΔRMSE": [round(delta_rmse_rsm,5),  round(delta_rmse_krig,5)],
-        "Risco": [risco_rsm, risco_krig],
-        "Score": [score_rsm, score_krig]
-    })
+    resumo=pd.DataFrame({"Parâmetro":["Kernel","RSM R² treino","RSM RMSE treino",
+        "RSM R² LOOCV","RSM RMSE LOOCV","Kriging R² treino","Kriging RMSE treino",
+        "Kriging R² LOOCV","Kriging RMSE LOOCV","σ médio","RSM em P*","Kriging em P*",
+        "Diff abs P*","🏆 Vencedor"],
+        "Valor":[kname,round(r2rt,6),round(mrt,6),round(r2rc,6),round(mrc,6),
+                 round(r2kt,6),round(mkt,6),round(r2kc,6),round(mkc,6),
+                 round(float(Zs.mean()),6),yrl,ykl,round(abs(yrl-ykl),6),venc]})
 
-    # Tabela detalhada por caso
-    res_rsm_cv  = y - y_pred_rsm_cv
-    res_krig_cv = y - y_pred_krig_cv
-    resultado   = dados.copy()
-    resultado["RSM_train"]    = y_pred_rsm
-    resultado["RSM_LOOCV"]   = y_pred_rsm_cv
-    resultado["RSM_res_LOOCV"] = res_rsm_cv
-    resultado["Krig_train"]  = y_pred_krig
-    resultado["Krig_sigma"]  = y_std_krig
-    resultado["Krig_LOOCV"]  = y_pred_krig_cv
-    resultado["Krig_res_LOOCV"] = res_krig_cv
+    al_df=pd.DataFrame({"Parâmetro":list(pl.keys()),"Valor":list(pl.values())})
 
-    resumo_final = pd.DataFrame({
-        "Parâmetro": [
-            "Kernel Kriging","RSM R² treino","RSM RMSE treino",
-            "RSM R² LOOCV","RSM RMSE LOOCV",
-            f"Kriging R² treino",f"Kriging RMSE treino",
-            f"Kriging R² LOOCV",f"Kriging RMSE LOOCV",
-            "Sigma médio (Kriging)","Predição local RSM",
-            "Predição local Kriging","Diferença local abs","Vencedor"
-        ],
-        "Valor": [
-            kernel_nome, round(r2_rsm_train,6), round(rmse_rsm_train,6),
-            round(r2_rsm_cv,6),  round(rmse_rsm_cv,6),
-            round(r2_krig_train,6), round(rmse_krig_train,6),
-            round(r2_krig_cv,6),    round(rmse_krig_cv,6),
-            round(Z_sigma.mean(),6), round(y_rsm_local,6),
-            round(y_krig_local,6),   round(abs(y_rsm_local-y_krig_local),6),
-            vencedor
-        ]
-    })
+    return dict(HN=HN,R=R,y=y,casos=casos,beta=beta,eq=eq,
+                ypr=ypr,ypr_cv=ypr_cv,ypk=ypk,ypk_cv=ypk_cv,ysk=ysk,
+                res_rc=res_rc,res_kc=res_kc,
+                HG=HG,RG=RG,Zr=Zr,Zk=Zk,Zs=Zs,Zd=Zd,
+                yrl=yrl,ykl=ykl,pl=pl,
+                tab_met=tab_met,resultado=resultado,resumo=resumo,
+                al_df=al_df,pc_df=pc_df,of=of,venc=venc,kname=kname,
+                r2rc=r2rc,r2kc=r2kc,mrc=mrc,mkc=mkc,r2rt=r2rt,r2kt=r2kt)
 
-    analise_local_df = pd.DataFrame({
-        "Parâmetro": list(ponto_local.keys()),
-        "Valor":     list(ponto_local.values())
-    })
+# ── Plotagem ─────────────────────────────────────────────────────────────────
 
-    return dict(
-        HN=HN, R=R, y=y, dados=dados,
-        beta=beta, eq_text=eq_text,
-        y_pred_rsm=y_pred_rsm, y_pred_rsm_cv=y_pred_rsm_cv,
-        y_pred_krig=y_pred_krig, y_pred_krig_cv=y_pred_krig_cv,
-        y_std_krig=y_std_krig, res_rsm_cv=res_rsm_cv, res_krig_cv=res_krig_cv,
-        HN_grid=HN_grid, R_grid=R_grid,
-        Z_rsm=Z_rsm, Z_krig=Z_krig, Z_sigma=Z_sigma, Z_diff=Z_diff,
-        y_rsm_local=y_rsm_local, y_krig_local=y_krig_local,
-        ponto_local=ponto_local,
-        tabela_metricas=met, resultado=resultado,
-        resumo_final=resumo_final, analise_local_df=analise_local_df,
-        ponto_critico_df=ponto_critico_df, df_overfit=df_overfit,
-        vencedor=vencedor, kernel_nome=kernel_nome,
-        r2_rsm_cv=r2_rsm_cv, r2_krig_cv=r2_krig_cv,
-        rmse_rsm_cv=rmse_rsm_cv, rmse_krig_cv=rmse_krig_cv,
-    )
-
-# ──────────────────────────────────────────────
-# FUNÇÕES DE PLOTAGEM PLOTLY
-# ──────────────────────────────────────────────
-
-COLORSCALE_SURF = "Turbo"
-COLORSCALE_CONT = "Jet"
-COLORSCALE_SIGMA = "Viridis"
-COLORSCALE_DIFF  = "RdBu"
-
-def plot_3d_surface(HN_grid, R_grid, Z, titulo, resposta,
-                    HN_pts, R_pts, y_pts,
-                    hn_star=None, r1_star=None, y_star=None,
-                    colorscale=COLORSCALE_SURF, sigma_surf=None):
-    fig = go.Figure()
-    # Superfície principal
-    kwargs = dict(opacity=0.82, colorscale=colorscale, showscale=True,
-                  lighting=dict(ambient=0.6, diffuse=0.8, specular=0.3, roughness=0.5),
-                  colorbar=dict(title=resposta.capitalize(), thickness=14, len=0.7))
-    if sigma_surf is not None:
-        kwargs["surfacecolor"] = sigma_surf
-        kwargs["colorbar"]["title"] = "σ (incerteza)"
-    fig.add_trace(go.Surface(x=HN_grid, y=R_grid, z=Z, **kwargs))
-    # Pontos experimentais
-    fig.add_trace(go.Scatter3d(
-        x=HN_pts, y=R_pts, z=y_pts,
-        mode="markers",
-        marker=dict(size=7, color="white", line=dict(color="black", width=2)),
-        name="Exp.", hovertemplate="HN=%{x:.2f}<br>r1=%{y:.3f}<br>y=%{z:.4f}<extra></extra>"
-    ))
-    # Ponto selecionado
-    if hn_star is not None:
-        fig.add_trace(go.Scatter3d(
-            x=[hn_star], y=[r1_star], z=[y_star],
-            mode="markers",
-            marker=dict(size=10, color="red", symbol="diamond",
-                        line=dict(color="black", width=1.5)),
-            name="P* selecionado",
-            hovertemplate=f"HN={hn_star:.2f}<br>r1={r1_star:.3f}<br>y={y_star:.4f}<extra>P*</extra>"
-        ))
+def fig3d(HG,RG,Z,titulo,resp,unid,HN,R,y,casos,
+          hn_s=None,r1_s=None,y_s=None,cs="Blues",sc=None):
+    fig=go.Figure()
+    kw=dict(opacity=0.83,colorscale=cs,showscale=True,
+            lighting=dict(ambient=0.6,diffuse=0.8,specular=0.3,roughness=0.5),
+            colorbar=dict(title=f"{resp}<br>({unid})",thickness=14,len=0.7))
+    if sc is not None: kw["surfacecolor"]=sc; kw["colorbar"]["title"]="σ"
+    fig.add_trace(go.Surface(x=HG,y=RG,z=Z,**kw))
+    fig.add_trace(go.Scatter3d(x=HN,y=R,z=y,mode="markers+text",
+        text=[str(c) for c in casos],textposition="top center",
+        textfont=dict(size=9,color="black"),
+        marker=dict(size=6,color="white",line=dict(color="black",width=2)),name="Experimental",
+        hovertemplate="<b>%{text}</b><br>HN=%{x:.2f}<br>r1=%{y:.3f}<br>y=%{z:.4f}<extra></extra>"))
+    if hn_s is not None:
+        fig.add_trace(go.Scatter3d(x=[hn_s],y=[r1_s],z=[y_s],mode="markers",
+            marker=dict(size=10,color="red",symbol="diamond",line=dict(color="black",width=1.5)),
+            name="P*",hovertemplate=f"P*<br>HN={hn_s:.2f}<br>r1={r1_s:.3f}<br>y={y_s:.4f}<extra></extra>"))
     fig.update_layout(
-        title=dict(text=titulo, font=dict(size=15, color="#1565c0")),
+        title=dict(text=titulo,font=dict(size=15,color="#1565c0")),
         scene=dict(
-            xaxis=dict(title="HN (mm)", backgroundcolor="#f8fafc",
-                       gridcolor="lightgray", showbackground=True),
-            yaxis=dict(title="r1 (V/U)", backgroundcolor="#f8fafc",
-                       gridcolor="lightgray", showbackground=True),
-            zaxis=dict(title=resposta.capitalize(), backgroundcolor="#f8fafc",
-                       gridcolor="lightgray", showbackground=True),
-            camera=dict(eye=dict(x=1.6, y=-1.6, z=1.2)),
-            aspectmode="auto"
-        ),
-        height=560, margin=dict(l=0, r=0, t=50, b=0),
-        legend=dict(yanchor="top", y=0.97, xanchor="left", x=0.01,
-                    bgcolor="rgba(255,255,255,0.85)", bordercolor="#ccc", borderwidth=1),
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
-    )
+            xaxis=dict(title="HN (mm)",backgroundcolor="#f4f6fb",gridcolor="#d0d8e8",showbackground=True),
+            yaxis=dict(title="r1 (V/U)",backgroundcolor="#f4f6fb",gridcolor="#d0d8e8",showbackground=True),
+            zaxis=dict(title=f"{resp} ({unid})",backgroundcolor="#f4f6fb",gridcolor="#d0d8e8",showbackground=True),
+            camera=dict(eye=dict(x=1.6,y=-1.6,z=1.2)),aspectmode="auto"),
+        height=580,margin=dict(l=0,r=0,t=55,b=0),
+        legend=dict(yanchor="top",y=0.97,xanchor="left",x=0.01,
+                    bgcolor="rgba(255,255,255,0.85)",bordercolor="#ccc",borderwidth=1),
+        paper_bgcolor="rgba(0,0,0,0)")
     return fig
 
 
-def plot_contorno(HN_grid, R_grid, Z, titulo, resposta, HN_pts, R_pts, casos,
-                  hn_star=None, r1_star=None, colorscale=COLORSCALE_CONT):
-    fig = go.Figure()
-    fig.add_trace(go.Contour(
-        x=HN_grid[0], y=R_grid[:,0], z=Z,
-        colorscale=colorscale, ncontours=18, showscale=True,
-        contours=dict(showlabels=True, labelfont=dict(size=10, color="black")),
-        colorbar=dict(title=resposta.capitalize(), thickness=14)
-    ))
-    fig.add_trace(go.Scatter(
-        x=HN_pts, y=R_pts, mode="markers+text",
-        text=[str(c) for c in casos], textposition="top right",
-        marker=dict(size=10, color="white", line=dict(color="black",width=2)),
-        name="Exp.", hovertemplate="Caso %{text}<br>HN=%{x:.2f}<br>r1=%{y:.3f}<extra></extra>"
-    ))
-    if hn_star is not None:
-        fig.add_trace(go.Scatter(
-            x=[hn_star], y=[r1_star], mode="markers+text",
-            text=["P*"], textposition="top right",
-            marker=dict(size=14, color="red", symbol="star",
-                        line=dict(color="black",width=1.5)),
-            name="P*"
-        ))
+def fig_cont(HG,RG,Z,titulo,resp,unid,HN,R,casos,hn_s=None,r1_s=None,cs="Jet"):
+    fig=go.Figure()
+    fig.add_trace(go.Contour(x=HG[0],y=RG[:,0],z=Z,colorscale=cs,ncontours=18,showscale=True,
+        contours=dict(showlabels=True,labelfont=dict(size=9,color="black")),
+        colorbar=dict(title=f"{resp} ({unid})",thickness=14)))
+    fig.add_trace(go.Scatter(x=HN,y=R,mode="markers+text",
+        text=[str(c) for c in casos],textposition="top right",textfont=dict(size=9),
+        marker=dict(size=10,color="white",line=dict(color="black",width=2)),name="Experimental",
+        hovertemplate="<b>%{text}</b><br>HN=%{x:.2f}<br>r1=%{y:.3f}<extra></extra>"))
+    if hn_s is not None:
+        fig.add_trace(go.Scatter(x=[hn_s],y=[r1_s],mode="markers+text",
+            text=["P*"],textposition="top right",textfont=dict(size=11,color="red"),
+            marker=dict(size=14,color="red",symbol="star",line=dict(color="black",width=1.5)),name="P*"))
+    # Aspecto equalizado: evita distorção entre escalas de HN e r1
+    hs=float(HG[0].max()-HG[0].min()); rs=float(RG[:,0].max()-RG[:,0].min())
+    ratio=rs/hs if hs>0 else 1.0
     fig.update_layout(
-        title=dict(text=titulo, font=dict(size=14, color="#1565c0")),
-        xaxis=dict(title="HN (mm)", gridcolor="#e0e0e0"),
-        yaxis=dict(title="r1 (V/U)", gridcolor="#e0e0e0"),
-        height=440, margin=dict(l=60,r=40,t=50,b=50),
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#fafafa",
-        legend=dict(bgcolor="rgba(255,255,255,0.85)")
-    )
+        title=dict(text=titulo,font=dict(size=14,color="#1565c0")),
+        xaxis=dict(title="HN (mm)",gridcolor="#e0e0e0",scaleanchor="y",scaleratio=ratio),
+        yaxis=dict(title="r1 (V/U)",gridcolor="#e0e0e0"),
+        height=520,margin=dict(l=65,r=40,t=55,b=60),
+        paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="#fafafa",
+        legend=dict(bgcolor="rgba(255,255,255,0.85)"))
     return fig
 
 
-def plot_parity(y_obs, y_pred_rsm, y_pred_krig, label_rsm, label_krig,
-                r2_rsm, r2_krig, resposta):
-    fig = go.Figure()
-    lims = [min(y_obs.min(), y_pred_rsm.min(), y_pred_krig.min())*0.97,
-            max(y_obs.max(), y_pred_rsm.max(), y_pred_krig.max())*1.03]
-    fig.add_trace(go.Scatter(x=lims, y=lims, mode="lines",
-                             line=dict(color="black", dash="dash", width=2),
-                             showlegend=False, hoverinfo="skip"))
-    fig.add_trace(go.Scatter(
-        x=y_obs, y=y_pred_rsm, mode="markers",
-        name=f"RSM (R²={r2_rsm:.4f})",
-        marker=dict(size=10, color="steelblue", line=dict(color="white",width=1.5)),
-        hovertemplate="Obs=%{x:.4f}<br>Pred=%{y:.4f}<extra>RSM</extra>"
-    ))
-    fig.add_trace(go.Scatter(
-        x=y_obs, y=y_pred_krig, mode="markers",
-        name=f"Kriging (R²={r2_krig:.4f})",
-        marker=dict(size=10, color="tomato", symbol="square",
-                    line=dict(color="white",width=1.5)),
-        hovertemplate="Obs=%{x:.4f}<br>Pred=%{y:.4f}<extra>Kriging</extra>"
-    ))
+def fig_parity(yobs,ypr,ypk,r2r,r2k,resp,unid,modo):
+    av=np.concatenate([yobs,ypr,ypk]); lims=[av.min()*0.97,av.max()*1.03]
+    fig=go.Figure()
+    fig.add_trace(go.Scatter(x=lims,y=lims,mode="lines",
+        line=dict(color="black",dash="dash",width=2),showlegend=False,hoverinfo="skip"))
+    fig.add_trace(go.Scatter(x=yobs,y=ypr,mode="markers",name=f"RSM (R²={r2r:.4f})",
+        marker=dict(size=10,color="#1565c0",line=dict(color="white",width=1.5)),
+        hovertemplate="Obs=%{x:.4f}<br>Pred=%{y:.4f}<extra>RSM</extra>"))
+    fig.add_trace(go.Scatter(x=yobs,y=ypk,mode="markers",name=f"Kriging (R²={r2k:.4f})",
+        marker=dict(size=10,color="tomato",symbol="square",line=dict(color="white",width=1.5)),
+        hovertemplate="Obs=%{x:.4f}<br>Pred=%{y:.4f}<extra>Kriging</extra>"))
     fig.update_layout(
-        title=dict(text=f"Parity Plot — {label_rsm} vs {label_krig}",
-                   font=dict(size=14, color="#1565c0")),
-        xaxis=dict(title=f"{resposta.capitalize()} observada", gridcolor="#e0e0e0"),
-        yaxis=dict(title=f"{resposta.capitalize()} predita",  gridcolor="#e0e0e0"),
-        height=440, margin=dict(l=60,r=40,t=50,b=50),
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#fafafa",
-        legend=dict(bgcolor="rgba(255,255,255,0.85)")
-    )
+        title=dict(text=f"Parity Plot — {modo} | {resp} ({unid})",font=dict(size=14,color="#1565c0")),
+        xaxis=dict(title=f"{resp} observado ({unid})",gridcolor="#e0e0e0",scaleanchor="y"),
+        yaxis=dict(title=f"{resp} predito ({unid})",gridcolor="#e0e0e0"),
+        height=470,margin=dict(l=65,r=40,t=55,b=60),
+        paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="#fafafa",
+        legend=dict(bgcolor="rgba(255,255,255,0.85)"))
     return fig
 
 
-def plot_residuos(y_pred_rsm_cv, res_rsm_cv, y_pred_krig_cv, res_krig_cv,
-                  kernel_nome, resposta):
-    fig = make_subplots(rows=1, cols=2,
-                        subplot_titles=("Resíduos vs Predito (LOOCV)",
-                                        "Distribuição dos Resíduos (LOOCV)"))
-    # Scatter resíduos
-    fig.add_trace(go.Scatter(x=y_pred_rsm_cv, y=res_rsm_cv, mode="markers",
-        name="RSM", marker=dict(size=9, color="steelblue",
-                                line=dict(color="white",width=1))), row=1, col=1)
-    fig.add_trace(go.Scatter(x=y_pred_krig_cv, y=res_krig_cv, mode="markers",
-        name=f"Kriging ({kernel_nome})", marker=dict(size=9, color="tomato", symbol="square",
-                                line=dict(color="white",width=1))), row=1, col=1)
-    fig.add_hline(y=0, line_dash="dash", line_color="black", row=1, col=1)
-    fig.update_xaxes(title_text=f"{resposta.capitalize()} predita", row=1, col=1)
-    fig.update_yaxes(title_text="Resíduo", row=1, col=1)
-    # Histogramas
-    fig.add_trace(go.Histogram(x=res_rsm_cv, name="RSM", nbinsx=8,
-        marker_color="steelblue", opacity=0.65), row=1, col=2)
-    fig.add_trace(go.Histogram(x=res_krig_cv, name=f"Kriging",  nbinsx=8,
-        marker_color="tomato", opacity=0.65), row=1, col=2)
-    fig.add_vline(x=0, line_dash="dash", line_color="black", row=1, col=2)
-    fig.update_xaxes(title_text="Resíduo", row=1, col=2)
-    fig.update_yaxes(title_text="Frequência", row=1, col=2)
-    fig.update_layout(height=420, margin=dict(l=50,r=40,t=60,b=50),
-                      barmode="overlay",
-                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#fafafa",
-                      legend=dict(bgcolor="rgba(255,255,255,0.85)"))
+def fig_res(ypr_cv,res_rc,ypk_cv,res_kc,kname,resp,unid):
+    fig=make_subplots(rows=1,cols=2,
+        subplot_titles=("Resíduos vs Predito (LOOCV)","Distribuição dos Resíduos (LOOCV)"))
+    fig.add_trace(go.Scatter(x=ypr_cv,y=res_rc,mode="markers",name="RSM",
+        marker=dict(size=9,color="#1565c0",line=dict(color="white",width=1))),row=1,col=1)
+    fig.add_trace(go.Scatter(x=ypk_cv,y=res_kc,mode="markers",name=f"Kriging ({kname})",
+        marker=dict(size=9,color="tomato",symbol="square",line=dict(color="white",width=1))),row=1,col=1)
+    fig.add_hline(y=0,line_dash="dash",line_color="black",row=1,col=1)
+    fig.update_xaxes(title_text=f"{resp} predito ({unid})",row=1,col=1)
+    fig.update_yaxes(title_text="Resíduo",row=1,col=1)
+    fig.add_trace(go.Histogram(x=res_rc,name="RSM",nbinsx=8,marker_color="#1565c0",opacity=0.65),row=1,col=2)
+    fig.add_trace(go.Histogram(x=res_kc,name="Kriging",nbinsx=8,marker_color="tomato",opacity=0.65),row=1,col=2)
+    fig.add_vline(x=0,line_dash="dash",line_color="black",row=1,col=2)
+    fig.update_xaxes(title_text="Resíduo",row=1,col=2)
+    fig.update_yaxes(title_text="Frequência",row=1,col=2)
+    fig.update_layout(height=430,margin=dict(l=55,r=40,t=60,b=50),barmode="overlay",
+        paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="#fafafa",
+        legend=dict(bgcolor="rgba(255,255,255,0.85)"))
     return fig
 
-
-# ──────────────────────────────────────────────
-# SIDEBAR
-# ──────────────────────────────────────────────
+# ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("""
-    <div style='text-align:center; padding:0.5rem 0 1rem;'>
-        <div style='font-size:2.5rem;'>🔬</div>
-        <div style='font-weight:700; color:#1565c0; font-size:1rem;'>RSM–Kriging Suite</div>
-        <div style='font-size:0.75rem; color:#666;'>UEM · Eng. Química · 3DCP Lab</div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("""<div style='text-align:center;padding:.4rem 0 1rem;'>
+        <div style='font-size:2.4rem;'>🔬</div>
+        <div style='font-weight:700;color:#1565c0;font-size:1rem;'>RSM-Kriging Suite</div>
+        <div style='font-size:.75rem;color:#666;'>UEM · Eng. Química · 3DCP Lab</div>
+    </div>""", unsafe_allow_html=True)
 
     st.markdown("### 📂 Dados de Entrada")
-    arquivo = st.file_uploader("Carregar arquivo Excel (.xlsx)", type=["xlsx"],
-                               help="Arquivo deve conter colunas: caso, hn, r1 e variáveis resposta.")
+    arquivo=st.file_uploader("Carregar Excel (.xlsx)",type=["xlsx"],
+        help="Colunas obrigatórias: caso, hn, r1 + respostas numéricas.")
 
-    resposta_sel   = None
-    kernel_sel     = "Matern 5/2"
-    hn_novo        = 16.0
-    r1_novo        = 0.95
-    colunas_excluir = ["caso", "hn", "r1"]
+    resposta_sel=kernel_sel=hn_novo=r1_novo=None; executar=False
 
     if arquivo:
-        df_prev = pd.read_excel(arquivo)
-        df_prev.columns = df_prev.columns.str.strip()
-        variaveis = [c for c in df_prev.columns
-                     if c not in colunas_excluir and pd.api.types.is_numeric_dtype(df_prev[c])]
-        excluidas = [c for c in df_prev.columns
-                     if c not in colunas_excluir and not pd.api.types.is_numeric_dtype(df_prev[c])]
+        df0=pd.read_excel(arquivo); df0.columns=df0.columns.str.strip()
+        variaveis=[c for c in df0.columns
+                   if c not in EXCLUIR and pd.api.types.is_numeric_dtype(df0[c])]
 
-        if excluidas:
-            st.info(f"Colunas categóricas removidas: {', '.join(excluidas)}")
+        st.markdown("### ⚙️ Modelo")
+        resposta_sel=st.selectbox("Variável Resposta",variaveis)
+        kernel_sel=st.selectbox("Kernel Kriging",KERNELS)
 
-        st.markdown("### ⚙️ Configurações do Modelo")
-        resposta_sel = st.selectbox("Variável Resposta", variaveis,
-                                    help="Coluna numérica a ser modelada")
-        kernel_sel   = st.selectbox("Kernel Kriging",
-                                    ["Matern 5/2","Matern 3/2","RBF","Rational Quadratic"],
-                                    help="Função de correlação espacial do GPR")
-
-        st.markdown("### 📍 Ponto de Análise Local")
-        hn_range_data = (float(df_prev["hn"].min()), float(df_prev["hn"].max()))
-        r1_range_data = (float(df_prev["r1"].min()), float(df_prev["r1"].max()))
-        hn_novo = st.number_input("HN (mm)", value=float(df_prev["hn"].mean()),
-                                  min_value=hn_range_data[0]*0.5,
-                                  max_value=hn_range_data[1]*1.5, step=0.5, format="%.2f")
-        r1_novo = st.number_input("r1 (V/U)", value=float(df_prev["r1"].mean()),
-                                  min_value=r1_range_data[0]*0.5,
-                                  max_value=r1_range_data[1]*1.5, step=0.01, format="%.3f")
-
+        st.markdown("### 📍 Ponto de Análise (P*)")
+        hn_novo=st.number_input("HN (mm)",
+            value=round(float(df0["hn"].mean()),2),
+            min_value=round(float(df0["hn"].min())*0.5,2),
+            max_value=round(float(df0["hn"].max())*1.5,2),
+            step=0.5,format="%.2f")
+        r1_novo=st.number_input("r1 (V/U)",
+            value=round(float(df0["r1"].mean()),3),
+            min_value=round(float(df0["r1"].min())*0.5,3),
+            max_value=round(float(df0["r1"].max())*1.5,3),
+            step=0.01,format="%.3f")
         st.markdown("---")
-        executar = st.button("▶  Executar Análise Completa", use_container_width=True)
-    else:
-        executar = False
+        executar=st.button("▶  Executar Análise Completa",use_container_width=True)
+        st.markdown("---")
+        st.markdown(f"""<div style='font-size:.78rem;color:#555;'>
+            <b>Dataset:</b> {df0.shape[0]} casos<br>
+            HN: {df0["hn"].min():.1f}–{df0["hn"].max():.1f} mm<br>
+            r1: {df0["r1"].min():.3f}–{df0["r1"].max():.3f}<br>
+            Respostas: {", ".join(variaveis)}</div>""", unsafe_allow_html=True)
 
-# ──────────────────────────────────────────────
-# HEADER PRINCIPAL
-# ──────────────────────────────────────────────
-st.markdown("""
-<div class="main-header">
-    <h1>🔬 RSM–Kriging Analysis Suite</h1>
-    <p>Plataforma interativa para ajuste, comparação e validação de metamodelos | UEM · 3DCP Lab</p>
-</div>
-""", unsafe_allow_html=True)
+# ── Header ────────────────────────────────────────────────────────────────────
+st.markdown("""<div class="main-header">
+    <h1>🔬 RSM-Kriging Analysis Suite</h1>
+    <p>Plataforma interativa para ajuste, comparação e validação de metamodelos ·
+       UEM · 3DCP Lab · Prof. Dr. Ricardo V. P. Rezende &amp; Doutoranda Allana Ribeiro Mendes</p>
+</div>""", unsafe_allow_html=True)
 
-# ──────────────────────────────────────────────
-# ESTADO INICIAL
-# ──────────────────────────────────────────────
 if not arquivo:
-    st.markdown("""
-    <div class="info-block">
-        👈 <b>Carregue um arquivo Excel</b> na barra lateral para iniciar a análise.<br>
-        O arquivo deve conter as colunas: <code>caso</code>, <code>hn</code>, <code>r1</code>
-        e as variáveis resposta numéricas.
-    </div>
-    """, unsafe_allow_html=True)
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("""**Modelos suportados**
-- RSM quadrática completa
-- Kriging / GPR (4 kernels)""")
-    with col2:
-        st.markdown("""**Validação**
-- LOOCV (Leave-One-Out)
-- 11 métricas estatísticas""")
-    with col3:
-        st.markdown("""**Gráficos 3D interativos**
-- Rotação livre e zoom
-- Superfícies RSM e Kriging""")
+    st.markdown("""<div style='background:#e3f2fd;border-radius:8px;padding:.9rem 1.1rem;
+        border-left:4px solid #1565c0;font-size:.88rem;color:#0d47a1;'>
+        👈 <b>Carregue o arquivo Excel</b> na barra lateral para iniciar.<br>
+        Estrutura: <code>caso, hn, r1</code> + respostas numéricas
+        (<code>largura, altura, area, ar, area_norm, perda_alt, espalhamento</code>).
+    </div>""", unsafe_allow_html=True)
+    c1,c2,c3=st.columns(3)
+    with c1: st.markdown("**Metamodelos**\n- RSM quadrática completa\n- Kriging/GPR (4 kernels)")
+    with c2: st.markdown("**Validação**\n- LOOCV (Leave-One-Out)\n- 11 métricas estatísticas")
+    with c3: st.markdown("**Visualizações**\n- 3D interativo e rotacionável\n- Contornos proporcionais")
     st.stop()
 
-# ──────────────────────────────────────────────
-# EXECUÇÃO
-# ──────────────────────────────────────────────
+# ── Execução ──────────────────────────────────────────────────────────────────
 if executar or "res" in st.session_state:
     if executar:
-        arquivo.seek(0)
-        df_bytes = arquivo.read()
-        with st.spinner("⏳ Ajustando modelos e validação LOOCV… aguarde."):
-            res = rodar_analise(df_bytes, resposta_sel, kernel_sel, hn_novo, r1_novo)
-        st.session_state["res"]     = res
-        st.session_state["resposta"] = resposta_sel
+        arquivo.seek(0); raw=arquivo.read()
+        with st.spinner("⏳ Ajustando RSM e Kriging + LOOCV… aguarde."):
+            res=rodar(raw,resposta_sel,kernel_sel,hn_novo,r1_novo)
+        st.session_state.update({"res":res,"resp":resposta_sel,
+                                  "hn0":hn_novo,"r10":r1_novo})
     else:
-        res      = st.session_state["res"]
-        resposta_sel = st.session_state.get("resposta", "y")
+        res=st.session_state["res"]
+        resposta_sel=st.session_state.get("resp","y")
+        hn_novo=st.session_state.get("hn0",15.0)
+        r1_novo=st.session_state.get("r10",0.9)
 
-    r = res  # atalho
+    d=res; unid=UNIDADES.get(resposta_sel,"—")
 
-    # ── KPIs no topo ──────────────────────────────
-    k1, k2, k3, k4 = st.columns(4)
-    with k1:
-        st.metric("RSM — R² LOOCV",  f"{r['r2_rsm_cv']:.4f}")
-    with k2:
-        st.metric("RSM — RMSE LOOCV", f"{r['rmse_rsm_cv']:.4f}")
-    with k3:
-        st.metric(f"Kriging — R² LOOCV",   f"{r['r2_krig_cv']:.4f}")
-    with k4:
-        st.metric(f"Kriging — RMSE LOOCV", f"{r['rmse_krig_cv']:.4f}")
+    # KPIs
+    k1,k2,k3,k4=st.columns(4)
+    k1.metric("RSM — R² LOOCV",      f"{d['r2rc']:.4f}")
+    k2.metric("RSM — RMSE LOOCV",    f"{d['mrc']:.4f}")
+    k3.metric("Kriging — R² LOOCV",  f"{d['r2kc']:.4f}")
+    k4.metric("Kriging — RMSE LOOCV",f"{d['mkc']:.4f}")
 
-    # ── ABAS PRINCIPAIS ───────────────────────────
-    tab_3d, tab_cont, tab_parity, tab_res, tab_metricas, tab_analise, tab_veredicto = st.tabs([
-        "🌐 Superfícies 3D",
-        "🗺️ Mapas de Contorno",
-        "📊 Parity Plots",
-        "📉 Resíduos",
-        "📋 Métricas",
-        "🔎 Análise Local & RSM",
-        "🏆 Veredicto Final"
-    ])
+    tabs=st.tabs(["🌐 Superfícies 3D","🗺️ Contornos","📊 Parity Plots",
+                  "📉 Resíduos","📋 Métricas","🔎 Análise Local","🏆 Veredicto"])
 
-    # ════════════════════════════════════════════
-    # ABA 1 — SUPERFÍCIES 3D
-    # ════════════════════════════════════════════
-    with tab_3d:
+    # ── ABA 1: 3D ─────────────────────────────────────────────────────────────
+    with tabs[0]:
         st.markdown("### 🌐 Superfícies 3D Interativas")
-        st.caption("Arraste para rotacionar · Scroll para zoom · Duplo clique para resetar a câmera")
-
-        opcao_3d = st.radio("Exibir superfície:",
-                            ["RSM", f"Kriging ({r['kernel_nome']})",
-                             "Comparação lado a lado", "Incerteza Kriging (σ)"],
-                            horizontal=True)
-
-        if opcao_3d == "RSM":
-            fig = plot_3d_surface(
-                r["HN_grid"], r["R_grid"], r["Z_rsm"],
-                f"Superfície RSM — {resposta_sel.capitalize()}",
-                resposta_sel, r["HN"], r["R"], r["y"],
-                hn_star=hn_novo, r1_star=r1_novo, y_star=r["y_rsm_local"],
-                colorscale="Turbo"
-            )
-            st.plotly_chart(fig, use_container_width=True, config={"scrollZoom":True})
-
-        elif opcao_3d == f"Kriging ({r['kernel_nome']})":
-            fig = plot_3d_surface(
-                r["HN_grid"], r["R_grid"], r["Z_krig"],
-                f"Superfície Kriging [{r['kernel_nome']}] — {resposta_sel.capitalize()}",
-                resposta_sel, r["HN"], r["R"], r["y"],
-                hn_star=hn_novo, r1_star=r1_novo, y_star=r["y_krig_local"],
-                colorscale="Turbo"
-            )
-            st.plotly_chart(fig, use_container_width=True, config={"scrollZoom":True})
-
-        elif opcao_3d == "Comparação lado a lado":
-            c1, c2 = st.columns(2)
+        st.caption("Arraste para rotacionar · Scroll para zoom · Duplo clique para resetar câmera")
+        modo=st.radio("Exibir:",["RSM",f"Kriging ({d['kname']})","Lado a lado","Incerteza σ"],
+                      horizontal=True,key="m3d")
+        if modo=="RSM":
+            st.plotly_chart(fig3d(d["HG"],d["RG"],d["Zr"],f"RSM — {resposta_sel}",
+                resposta_sel,unid,d["HN"],d["R"],d["y"],d["casos"],
+                hn_novo,r1_novo,d["yrl"],cs="Blues"),
+                use_container_width=True,config={"scrollZoom":True})
+        elif modo==f"Kriging ({d['kname']})":
+            st.plotly_chart(fig3d(d["HG"],d["RG"],d["Zk"],
+                f"Kriging [{d['kname']}] — {resposta_sel}",
+                resposta_sel,unid,d["HN"],d["R"],d["y"],d["casos"],
+                hn_novo,r1_novo,d["ykl"],cs="Reds"),
+                use_container_width=True,config={"scrollZoom":True})
+        elif modo=="Lado a lado":
+            c1,c2=st.columns(2)
             with c1:
-                fig1 = plot_3d_surface(
-                    r["HN_grid"], r["R_grid"], r["Z_rsm"],
-                    f"RSM — {resposta_sel.capitalize()}",
-                    resposta_sel, r["HN"], r["R"], r["y"],
-                    hn_star=hn_novo, r1_star=r1_novo, y_star=r["y_rsm_local"],
-                    colorscale="Blues"
-                )
-                st.plotly_chart(fig1, use_container_width=True, config={"scrollZoom":True})
+                st.plotly_chart(fig3d(d["HG"],d["RG"],d["Zr"],f"RSM — {resposta_sel}",
+                    resposta_sel,unid,d["HN"],d["R"],d["y"],d["casos"],
+                    hn_novo,r1_novo,d["yrl"],cs="Blues"),
+                    use_container_width=True,config={"scrollZoom":True})
             with c2:
-                fig2 = plot_3d_surface(
-                    r["HN_grid"], r["R_grid"], r["Z_krig"],
-                    f"Kriging [{r['kernel_nome']}] — {resposta_sel.capitalize()}",
-                    resposta_sel, r["HN"], r["R"], r["y"],
-                    hn_star=hn_novo, r1_star=r1_novo, y_star=r["y_krig_local"],
-                    colorscale="Reds"
-                )
-                st.plotly_chart(fig2, use_container_width=True, config={"scrollZoom":True})
-
-        else:  # Incerteza
-            fig = plot_3d_surface(
-                r["HN_grid"], r["R_grid"], r["Z_krig"],
-                f"Incerteza Kriging (σ) — {resposta_sel.capitalize()}",
-                resposta_sel, r["HN"], r["R"], r["y"],
-                hn_star=hn_novo, r1_star=r1_novo, y_star=r["y_krig_local"],
-                colorscale="Viridis", sigma_surf=r["Z_sigma"]
-            )
-            st.plotly_chart(fig, use_container_width=True, config={"scrollZoom":True})
-
-    # ════════════════════════════════════════════
-    # ABA 2 — MAPAS DE CONTORNO
-    # ════════════════════════════════════════════
-    with tab_cont:
-        st.markdown("### 🗺️ Mapas de Contorno 2D")
-        opcao_cont = st.radio("Selecionar mapa:",
-                              ["RSM", f"Kriging ({r['kernel_nome']})",
-                               "Incerteza σ (Kriging)", "Diferença (Kriging − RSM)"],
-                              horizontal=True)
-        mapa_dados = {
-            "RSM": (r["Z_rsm"], COLORSCALE_CONT),
-            f"Kriging ({r['kernel_nome']})": (r["Z_krig"], COLORSCALE_CONT),
-            "Incerteza σ (Kriging)": (r["Z_sigma"], COLORSCALE_SIGMA),
-            "Diferença (Kriging − RSM)": (r["Z_diff"], "RdBu"),
-        }
-        Z_sel, cs_sel = mapa_dados[opcao_cont]
-        fig_c = plot_contorno(
-            r["HN_grid"], r["R_grid"], Z_sel,
-            f"{opcao_cont} — {resposta_sel.capitalize()}",
-            resposta_sel, r["HN"], r["R"], r["dados"]["caso"].values,
-            hn_star=hn_novo, r1_star=r1_novo, colorscale=cs_sel
-        )
-        st.plotly_chart(fig_c, use_container_width=True)
-
-    # ════════════════════════════════════════════
-    # ABA 3 — PARITY PLOTS
-    # ════════════════════════════════════════════
-    with tab_parity:
-        st.markdown("### 📊 Parity Plots")
-        modo_parity = st.radio("Visualizar:", ["Treino", "LOOCV", "Ambos"], horizontal=True)
-
-        if modo_parity in ["Treino", "Ambos"]:
-            st.markdown("#### Treino")
-            fig_pt = plot_parity(
-                r["y"], r["y_pred_rsm"], r["y_pred_krig"],
-                "RSM Treino", f"Kriging Treino",
-                r2_score(r["y"], r["y_pred_rsm"]),
-                r2_score(r["y"], r["y_pred_krig"]),
-                resposta_sel
-            )
-            st.plotly_chart(fig_pt, use_container_width=True)
-
-        if modo_parity in ["LOOCV", "Ambos"]:
-            st.markdown("#### LOOCV")
-            fig_pl = plot_parity(
-                r["y"], r["y_pred_rsm_cv"], r["y_pred_krig_cv"],
-                "RSM LOOCV", f"Kriging LOOCV",
-                r["r2_rsm_cv"], r["r2_krig_cv"],
-                resposta_sel
-            )
-            st.plotly_chart(fig_pl, use_container_width=True)
-
-    # ════════════════════════════════════════════
-    # ABA 4 — RESÍDUOS
-    # ════════════════════════════════════════════
-    with tab_res:
-        st.markdown("### 📉 Análise de Resíduos (LOOCV)")
-        fig_r = plot_residuos(
-            r["y_pred_rsm_cv"], r["res_rsm_cv"],
-            r["y_pred_krig_cv"], r["res_krig_cv"],
-            r["kernel_nome"], resposta_sel
-        )
-        st.plotly_chart(fig_r, use_container_width=True)
-
-        with st.expander("📄 Tabela detalhada por caso"):
-            st.dataframe(r["resultado"].round(6), use_container_width=True)
-
-    # ════════════════════════════════════════════
-    # ABA 5 — MÉTRICAS
-    # ════════════════════════════════════════════
-    with tab_metricas:
-        st.markdown("### 📋 Tabela Comparativa de Métricas")
-        met = r["tabela_metricas"].copy()
-
-        def color_r2(val):
-            try:
-                v = float(val)
-                if v >= 0.98: return "background-color:#c8e6c9; color:#1b5e20"
-                if v >= 0.90: return "background-color:#fff9c4; color:#f57f17"
-                return "background-color:#ffcdd2; color:#b71c1c"
-            except: return ""
-        def color_rmse(val):
-            try:
-                v = float(val)
-                if v < 0.1: return "background-color:#c8e6c9; color:#1b5e20"
-                if v < 0.5: return "background-color:#fff9c4; color:#f57f17"
-                return "background-color:#ffcdd2; color:#b71c1c"
-            except: return ""
-
-        styled = (met.style
-                  .applymap(color_r2,  subset=["R²","Q²"])
-                  .applymap(color_rmse, subset=["RMSE"])
-                  .format({c: "{:.5f}" for c in met.select_dtypes("number").columns}))
-        st.dataframe(styled, use_container_width=True)
-
-        st.markdown("#### Resumo Final")
-        st.dataframe(r["resumo_final"], use_container_width=True)
-
-        # Download Excel
-        buf = io.BytesIO()
-        with pd.ExcelWriter(buf, engine="openpyxl") as writer:
-            r["tabela_metricas"].to_excel(writer, sheet_name="Métricas", index=False)
-            r["resultado"].to_excel(writer, sheet_name="Por Caso", index=False)
-            r["resumo_final"].to_excel(writer, sheet_name="Resumo Final", index=False)
-        st.download_button(
-            "⬇️ Baixar tabelas em Excel",
-            data=buf.getvalue(),
-            file_name=f"metricas_{resposta_sel}_{r['kernel_nome'].replace(' ','_')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
-    # ════════════════════════════════════════════
-    # ABA 6 — ANÁLISE LOCAL & RSM
-    # ════════════════════════════════════════════
-    with tab_analise:
-        st.markdown(f"### 🔎 Análise Local — Ponto P*(HN={hn_novo:.2f}, r1={r1_novo:.3f})")
-
-        col_eq, col_pc = st.columns([3, 2])
-        with col_eq:
-            st.markdown("#### Equação ajustada da RSM")
-            st.code(r["eq_text"], language="python")
-
-        with col_pc:
-            st.markdown("#### Ponto Crítico da RSM")
-            st.dataframe(r["ponto_critico_df"], use_container_width=True, hide_index=True)
-
-        st.markdown("#### Análise Local Completa no Ponto P*")
-        df_loc = r["analise_local_df"].copy()
-        st.dataframe(df_loc, use_container_width=True, hide_index=True)
-
-        # Gauge de incerteza local
-        sigma_val = r["ponto_local"]["Krig_sigma"]
-        ic_inf    = r["ponto_local"]["IC_inf_95"]
-        ic_sup    = r["ponto_local"]["IC_sup_95"]
-        interp    = r["ponto_local"]["Interpretação"]
-
-        c1, c2 = st.columns(2)
-        with c1:
-            st.metric("Predição RSM no P*",   f"{r['y_rsm_local']:.5f}")
-            st.metric("Predição Kriging no P*", f"{r['y_krig_local']:.5f}")
-        with c2:
-            st.metric("Incerteza σ (Kriging)", f"{sigma_val:.5f}")
-            st.metric("IC 95% Kriging", f"[{ic_inf:.4f} , {ic_sup:.4f}]")
-
-        st.markdown(f"**Avaliação de concordância local:** {interp}")
-
-    # ════════════════════════════════════════════
-    # ABA 7 — VEREDICTO FINAL
-    # ════════════════════════════════════════════
-    with tab_veredicto:
-        st.markdown("### 🏆 Veredicto Final e Risco de Overfitting")
-        st.dataframe(r["df_overfit"], use_container_width=True, hide_index=True)
-
-        st.markdown("---")
-        venc = r["vencedor"]
-        if venc == "Kriging":
-            cls_v = "verdict-kriging"
-            texto_v = f"""
-            🏆 <b>Modelo mais confiável: Kriging [{r['kernel_nome']}]</b><br><br>
-            O Kriging apresentou superioridade na validação cruzada LOOCV com
-            R²={r['r2_krig_cv']:.4f} e RMSE={r['rmse_krig_cv']:.4f}.<br>
-            Seu comportamento interpolativo não comprometeu a capacidade de generalização.<br>
-            <b>Recomendação: utilize o Kriging como metamodelo primário para esta resposta.</b>
-            """
+                st.plotly_chart(fig3d(d["HG"],d["RG"],d["Zk"],f"Kriging — {resposta_sel}",
+                    resposta_sel,unid,d["HN"],d["R"],d["y"],d["casos"],
+                    hn_novo,r1_novo,d["ykl"],cs="Reds"),
+                    use_container_width=True,config={"scrollZoom":True})
         else:
-            cls_v = "verdict-rsm"
-            texto_v = f"""
-            🏆 <b>Modelo mais confiável: RSM (Superfície de Resposta)</b><br><br>
-            A RSM apresentou melhor robustez e menor risco de sobreajuste,
-            com R²={r['r2_rsm_cv']:.4f} e RMSE={r['rmse_rsm_cv']:.4f} em LOOCV.<br>
-            Sua forma analítica explícita facilita interpretação e otimização.<br>
-            <b>Recomendação: utilize a RSM como metamodelo primário para esta resposta.</b>
-            """
-        st.markdown(f'<div class="verdict-box {cls_v}">{texto_v}</div>',
-                    unsafe_allow_html=True)
+            st.plotly_chart(fig3d(d["HG"],d["RG"],d["Zk"],f"Incerteza σ — {resposta_sel}",
+                resposta_sel,unid,d["HN"],d["R"],d["y"],d["casos"],
+                hn_novo,r1_novo,d["ykl"],cs="Viridis",sc=d["Zs"]),
+                use_container_width=True,config={"scrollZoom":True})
 
-        # Gráfico de pontuação
-        df_sc = r["df_overfit"][["Modelo","Score"]].copy()
-        fig_sc = px.bar(df_sc, x="Modelo", y="Score", color="Modelo",
-                        title="Pontuação Final dos Modelos",
-                        color_discrete_map={
-                            df_sc["Modelo"].iloc[0]: "#1565c0",
-                            df_sc["Modelo"].iloc[1]: "#c62828"
-                        },
-                        text="Score")
+    # ── ABA 2: Contornos ──────────────────────────────────────────────────────
+    with tabs[1]:
+        st.markdown("### 🗺️ Mapas de Contorno 2D")
+        st.caption("Aspecto equalizado — proporção real entre HN e r1 sem distorção")
+        opcoes={"RSM":(d["Zr"],"Jet"),f"Kriging ({d['kname']})":(d["Zk"],"Jet"),
+                "Incerteza σ":(d["Zs"],"Viridis"),"Diferença (Kriging−RSM)":(d["Zd"],"RdBu")}
+        mc=st.radio("Mapa:",list(opcoes.keys()),horizontal=True,key="mc")
+        Zsel,cssel=opcoes[mc]
+        st.plotly_chart(fig_cont(d["HG"],d["RG"],Zsel,
+            f"{mc} — {resposta_sel} ({unid})",resposta_sel,unid,
+            d["HN"],d["R"],d["casos"],hn_novo,r1_novo,cssel),
+            use_container_width=True)
+
+    # ── ABA 3: Parity ─────────────────────────────────────────────────────────
+    with tabs[2]:
+        st.markdown("### 📊 Parity Plots")
+        mp=st.radio("Conjunto:",["Treino","LOOCV"],horizontal=True,key="mp")
+        if mp=="Treino":
+            st.plotly_chart(fig_parity(d["y"],d["ypr"],d["ypk"],
+                d["r2rt"],d["r2kt"],resposta_sel,unid,"Treino"),use_container_width=True)
+        else:
+            st.plotly_chart(fig_parity(d["y"],d["ypr_cv"],d["ypk_cv"],
+                d["r2rc"],d["r2kc"],resposta_sel,unid,"LOOCV"),use_container_width=True)
+
+    # ── ABA 4: Resíduos ───────────────────────────────────────────────────────
+    with tabs[3]:
+        st.markdown("### 📉 Resíduos LOOCV")
+        st.plotly_chart(fig_res(d["ypr_cv"],d["res_rc"],d["ypk_cv"],d["res_kc"],
+            d["kname"],resposta_sel,unid),use_container_width=True)
+        with st.expander("📄 Tabela detalhada por caso"):
+            st.dataframe(d["resultado"].round(5),use_container_width=True,hide_index=True)
+
+    # ── ABA 5: Métricas ───────────────────────────────────────────────────────
+    with tabs[4]:
+        st.markdown("### 📋 Métricas Comparativas")
+        met=d["tab_met"].copy()
+        num=met.select_dtypes(include="number").columns.tolist()
+
+        def cr2(v):
+            try:
+                v=float(v)
+                if v>=0.98: return "background-color:#c8e6c9;color:#1b5e20"
+                if v>=0.90: return "background-color:#fff9c4;color:#7c5900"
+                return "background-color:#ffcdd2;color:#b71c1c"
+            except: return ""
+
+        def crm(v):
+            try:
+                v=float(v)
+                if v<0.5:  return "background-color:#c8e6c9;color:#1b5e20"
+                if v<2.0:  return "background-color:#fff9c4;color:#7c5900"
+                return "background-color:#ffcdd2;color:#b71c1c"
+            except: return ""
+
+        # Compatível com pandas antigo (.applymap) e novo (.map)
+        try:
+            styled=(met.style
+                    .map(cr2,subset=["R²","Q²"])
+                    .map(crm,subset=["RMSE"])
+                    .format({c:"{:.5f}" for c in num}))
+        except AttributeError:
+            styled=(met.style
+                    .applymap(cr2,subset=["R²","Q²"])
+                    .applymap(crm,subset=["RMSE"])
+                    .format({c:"{:.5f}" for c in num}))
+
+        st.dataframe(styled,use_container_width=True,hide_index=True)
+        st.markdown("#### Resumo Final")
+        st.dataframe(d["resumo"],use_container_width=True,hide_index=True)
+
+        buf=io.BytesIO()
+        with pd.ExcelWriter(buf,engine="openpyxl") as w:
+            d["tab_met"].to_excel(w,sheet_name="Métricas",index=False)
+            d["resultado"].to_excel(w,sheet_name="Por Caso",index=False)
+            d["resumo"].to_excel(w,sheet_name="Resumo Final",index=False)
+        st.download_button("⬇️ Baixar tabelas em Excel",data=buf.getvalue(),
+            file_name=f"metricas_{resposta_sel}_{d['kname'].replace(' ','_')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+    # ── ABA 6: Análise Local ──────────────────────────────────────────────────
+    with tabs[5]:
+        st.markdown(f"### 🔎 Análise Local — P*(HN={hn_novo:.2f} mm, r1={r1_novo:.3f})")
+        c1,c2=st.columns([3,2])
+        with c1:
+            st.markdown("#### Equação RSM ajustada")
+            st.code(d["eq"],language="text")
+        with c2:
+            st.markdown("#### Ponto Crítico RSM")
+            st.dataframe(d["pc_df"],use_container_width=True,hide_index=True)
+        st.markdown("#### Análise Completa no Ponto P*")
+        st.dataframe(d["al_df"],use_container_width=True,hide_index=True)
+        m1,m2,m3,m4=st.columns(4)
+        sig_v=d["pl"]["Kriging — σ"]
+        ic_i=d["pl"]["IC 95% inferior"]; ic_s=d["pl"]["IC 95% superior"]
+        m1.metric("RSM em P*",    f"{d['yrl']:.5f} {unid}")
+        m2.metric("Kriging em P*",f"{d['ykl']:.5f} {unid}")
+        m3.metric("Incerteza σ",  f"{sig_v:.5f} {unid}")
+        m4.metric("IC 95%",       f"[{ic_i:.3f}, {ic_s:.3f}]")
+        st.info(f"**Concordância local:** {d['pl']['Interpretação']}")
+
+    # ── ABA 7: Veredicto ──────────────────────────────────────────────────────
+    with tabs[6]:
+        st.markdown("### 🏆 Veredicto Final")
+        st.dataframe(d["of"],use_container_width=True,hide_index=True)
+        st.markdown("---")
+        venc=d["venc"]
+        if venc=="Kriging":
+            cls_v,txt_v="verdict-kriging",(
+                f"🏆 <b>Modelo mais confiável: Kriging [{d['kname']}]</b><br><br>"
+                f"R² LOOCV = {d['r2kc']:.4f} · RMSE LOOCV = {d['mkc']:.4f}<br>"
+                f"Comportamento interpolativo não comprometeu a generalização.<br>"
+                f"<b>Recomendação: Kriging como metamodelo primário para {resposta_sel}.</b>")
+        else:
+            cls_v,txt_v="verdict-rsm",(
+                f"🏆 <b>Modelo mais confiável: RSM</b><br><br>"
+                f"R² LOOCV = {d['r2rc']:.4f} · RMSE LOOCV = {d['mrc']:.4f}<br>"
+                f"Maior robustez e menor risco de sobreajuste.<br>"
+                f"<b>Recomendação: RSM como metamodelo primário para {resposta_sel}.</b>")
+        st.markdown(f'<div class="verdict-box {cls_v}">{txt_v}</div>',unsafe_allow_html=True)
+        fig_sc=px.bar(d["of"],x="Modelo",y="Score",color="Modelo",text="Score",
+            title="Pontuação Final",color_discrete_sequence=["#1565c0","tomato"])
         fig_sc.update_traces(textposition="outside")
-        fig_sc.update_layout(showlegend=False, height=360,
-                              paper_bgcolor="rgba(0,0,0,0)",
-                              plot_bgcolor="#fafafa",
-                              yaxis=dict(title="Score", gridcolor="#e0e0e0"))
-        st.plotly_chart(fig_sc, use_container_width=True)
+        fig_sc.update_layout(showlegend=False,height=350,
+            paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="#fafafa",
+            yaxis=dict(gridcolor="#e0e0e0"))
+        st.plotly_chart(fig_sc,use_container_width=True)
 
-# ──────────────────────────────────────────────
-# RODAPÉ
-# ──────────────────────────────────────────────
+# ── Rodapé ────────────────────────────────────────────────────────────────────
 st.markdown("---")
-st.markdown("""
-<div style='text-align:center; color:#888; font-size:0.8rem; padding:0.5rem;'>
-    RSM–Kriging Analysis Suite v3.0 · Prof. Dr. Ricardo V. P. Rezende &
+st.markdown("""<div style='text-align:center;color:#999;font-size:.78rem;padding:.4rem;'>
+    RSM-Kriging Analysis Suite v3.1 · Prof. Dr. Ricardo V. P. Rezende &amp;
     Doutoranda Allana Ribeiro Mendes<br>
     Universidade Estadual de Maringá · Departamento de Engenharia Química · 3DCP Lab
-</div>
-""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
