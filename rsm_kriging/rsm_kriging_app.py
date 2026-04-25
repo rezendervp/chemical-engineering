@@ -54,16 +54,78 @@ html,body,[class*="css"]{font-family:'Segoe UI',sans-serif;}
 
 # ── Constantes ────────────────────────────────────────────────────────────────
 EXCLUIR  = ["caso","hn","v","u","r1","r2","regime","estabilidade"]
-KERNELS  = ["Matern 5/2","Matern 3/2","RBF","Rational Quadratic"]
+# Kernels disponíveis — agrupados por categoria
+KERNELS = [
+    # ── Clássicos (isotrópicos) ──────────────────────────────────
+    "Matern 5/2",
+    "Matern 3/2",
+    "RBF",
+    "Rational Quadratic",
+    # ── ARD: length_scale independente por fator ─────────────────
+    "Matern 5/2 · ARD",
+    "Matern 3/2 · ARD",
+    "RBF · ARD",
+    # ── Compostos: capturam curvatura heterogênea ────────────────
+    "Matern 5/2 + RBF",          # suavidade global + variação local
+    "Matern 5/2 × RQ",           # amplitude modulada por escala múltipla
+    "Matern 5/2 · ARD + Matern 3/2 · ARD",  # curvatura mista com ARD
+]
+
+KERNEL_DESCRICOES = {
+    "Matern 5/2":
+        "Clássico. Superfícies duas vezes diferenciáveis. Bom ponto de partida.",
+    "Matern 3/2":
+        "Menos suave que 5/2. Bom quando a superfície tem variações mais abruptas.",
+    "RBF":
+        "Infinitamente diferenciável. Pode ser excessivamente suave — use com cautela.",
+    "Rational Quadratic":
+        "Equivale a soma de RBFs com escalas variadas. Bom para multi-escala.",
+    "Matern 5/2 · ARD":
+        "ARD: cada fator (HN, r1) tem seu próprio length_scale. "
+        "Ideal quando os fatores têm escalas de correlação muito diferentes.",
+    "Matern 3/2 · ARD":
+        "Matern 3/2 com ARD. Variações abruptas + escalas independentes por fator.",
+    "RBF · ARD":
+        "RBF com ARD. Suave, mas com sensibilidade diferente em cada direção.",
+    "Matern 5/2 + RBF":
+        "Composto aditivo: captura tendência global (Matern) + variação local suave (RBF). "
+        "Útil quando há regiões de curvatura intensa e outras suaves.",
+    "Matern 5/2 × RQ":
+        "Composto multiplicativo: amplitude da correlação varia com a escala. "
+        "Robusto para superfícies com padrões em múltiplas escalas.",
+    "Matern 5/2 · ARD + Matern 3/2 · ARD":
+        "Composto aditivo com ARD em ambos. Mais expressivo — captura curvatura "
+        "heterogênea com escalas independentes por fator. Mais lento para otimizar.",
+}
 UNIDADES = {"largura":"mm","altura":"mm","area":"mm²","ar":"mm²",
             "area_norm":"—","perda_alt":"mm","espalhamento":"mm"}
 
 # ── Funções analíticas ────────────────────────────────────────────────────────
 
 def montar_kernel(nome):
-    B = {"Matern 3/2":Matern(nu=1.5),"Matern 5/2":Matern(nu=2.5),
-         "RBF":RBF(),"Rational Quadratic":RationalQuadratic()}[nome]
-    return ConstantKernel(1.0)*B + WhiteKernel(noise_level=1e-3)
+    """Constrói o kernel GPR conforme seleção do usuário."""
+    ls2 = [1.0, 1.0]   # ARD: length_scale inicial por fator [HN, r1]
+    W   = WhiteKernel(noise_level=1e-3, noise_level_bounds=(1e-6, 1e-1))
+    C   = ConstantKernel(1.0)
+
+    if   nome == "Matern 5/2":         B = Matern(nu=2.5)
+    elif nome == "Matern 3/2":         B = Matern(nu=1.5)
+    elif nome == "RBF":                B = RBF()
+    elif nome == "Rational Quadratic": B = RationalQuadratic()
+    elif nome == "Matern 5/2 · ARD":  B = Matern(nu=2.5, length_scale=ls2)
+    elif nome == "Matern 3/2 · ARD":  B = Matern(nu=1.5, length_scale=ls2)
+    elif nome == "RBF · ARD":         B = RBF(length_scale=ls2)
+    elif nome == "Matern 5/2 + RBF":
+        return C * Matern(nu=2.5) + ConstantKernel(0.5) * RBF() + W
+    elif nome == "Matern 5/2 × RQ":
+        return C * (Matern(nu=2.5) * RationalQuadratic()) + W
+    elif nome == "Matern 5/2 · ARD + Matern 3/2 · ARD":
+        return (C * Matern(nu=2.5, length_scale=ls2) +
+                ConstantKernel(0.5) * Matern(nu=1.5, length_scale=ls2) + W)
+    else:
+        B = Matern(nu=2.5)   # fallback
+
+    return C * B + W
 
 
 def metricas(y,yp,nome,p=None):
@@ -475,8 +537,20 @@ with st.sidebar:
                    if c not in EXCLUIR and pd.api.types.is_numeric_dtype(df0[c])]
 
         st.markdown("### ⚙️ Modelo")
-        resposta_sel=st.selectbox("Variável Resposta",variaveis)
-        kernel_sel=st.selectbox("Kernel Kriging",KERNELS)
+        resposta_sel = st.selectbox("Variável Resposta", variaveis)
+
+        st.markdown("**Kernel Kriging**")
+        kernel_sel = st.selectbox(
+            "Kernel Kriging", KERNELS, label_visibility="collapsed",
+            help="Escolha o kernel conforme o comportamento esperado da superfície."
+        )
+        # Descrição do kernel selecionado
+        st.markdown(
+            f"<div style='font-size:.76rem;color:#1565c0;background:#e8f0fe;"
+            f"border-radius:6px;padding:.5rem .7rem;margin-top:-.3rem;'>"
+            f"ℹ️ {KERNEL_DESCRICOES.get(kernel_sel,'')}</div>",
+            unsafe_allow_html=True
+        )
 
         st.markdown("### 📍 Ponto de Análise (P*)")
         hn_novo=st.number_input("HN (mm)",
