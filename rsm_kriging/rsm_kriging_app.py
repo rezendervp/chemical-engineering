@@ -289,7 +289,7 @@ def fig3d(HG,RG,Z,titulo,resp,unid,HN,R,y,casos,
             fig.add_trace(go.Scatter3d(
                 x=[xi], y=[ri], z=[zi], mode="markers",
                 marker=dict(
-                    size=12,
+                    size=16,
                     color=[0.3],           # posição no colorscale (parte clara)
                     colorscale=sphere_cs,
                     opacity=0.75,
@@ -354,31 +354,66 @@ def fig3d(HG,RG,Z,titulo,resp,unid,HN,R,y,casos,
 
 def fig_cont(HG,RG,Z,titulo,resp,unid,HN,R,casos,hn_s=None,r1_s=None,cs="Jet"):
     fig=go.Figure()
-    fig.add_trace(go.Contour(x=HG[0],y=RG[:,0],z=Z,colorscale=cs,ncontours=18,showscale=True,
-        contours=dict(showlabels=True,labelfont=dict(size=9,color="black")),
-        colorbar=dict(title=f"{resp} ({unid})",thickness=14)))
-    fig.add_trace(go.Scatter(x=HN,y=R,mode="markers+text",
-        text=[str(c) for c in casos],textposition="top right",textfont=dict(size=9),
-        marker=dict(size=10,color="white",line=dict(color="black",width=2)),name="Experimental",
-        hovertemplate="<b>%{text}</b><br>HN=%{x:.2f}<br>r1=%{y:.3f}<extra></extra>"))
-    if hn_s is not None:
-        fig.add_trace(go.Scatter(x=[hn_s],y=[r1_s],mode="markers+text",
-            text=["P*"],textposition="top right",textfont=dict(size=11,color="red"),
-            marker=dict(size=14,color="red",symbol="star",line=dict(color="black",width=1.5)),name="P*"))
-    # Aspecto 1:1 real — mesmo mecanismo do parity plot que funcionou
+
     xvals = HG[0]; yvals = RG[:,0]
-    xpad = (xvals.max()-xvals.min())*0.05; ypad = (yvals.max()-yvals.min())*0.05
-    xlo=xvals.min()-xpad; xhi=xvals.max()+xpad
-    ylo=yvals.min()-ypad; yhi=yvals.max()+ypad
+    xspan = float(xvals.max()-xvals.min())
+    yspan = float(yvals.max()-yvals.min())
+    xpad  = xspan*0.06; ypad = yspan*0.10
+    xlo=float(xvals.min())-xpad; xhi=float(xvals.max())+xpad
+    ylo=float(yvals.min())-ypad; yhi=float(yvals.max())+ypad
+
+    # Dimensões do canvas: manter proporção dos dados com altura mínima de 380 px
+    PLOT_W  = 820          # largura fixa da área de plot em px
+    ratio   = yspan/xspan  # razão real dos dados
+    PLOT_H  = max(int(PLOT_W * ratio), 380)
+    # Margens fixas para título, eixos e colorbar
+    ML,MR,MT,MB = 72, 110, 55, 65
+    total_w = PLOT_W + ML + MR
+    total_h = PLOT_H + MT + MB
+
+    fig.add_trace(go.Contour(
+        x=xvals, y=yvals, z=Z,
+        colorscale=cs, ncontours=18, showscale=True,
+        contours=dict(showlabels=True, labelfont=dict(size=8, color="black")),
+        colorbar=dict(
+            title=dict(text=f"{resp}<br>({unid})", side="right"),
+            thickness=16, len=0.90,
+            x=1.02, xanchor="left",   # força colorbar para fora do plot
+            y=0.5,  yanchor="middle",
+        ),
+    ))
+    fig.add_trace(go.Scatter(
+        x=HN, y=R, mode="markers+text",
+        text=[str(c) for c in casos], textposition="top right",
+        textfont=dict(size=8, color="#111"),
+        marker=dict(size=9, color="white", line=dict(color="black", width=2)),
+        name="Experimental",
+        hovertemplate="<b>%{text}</b><br>HN=%{x:.2f}<br>r1=%{y:.3f}<extra></extra>",
+    ))
+    if hn_s is not None:
+        fig.add_trace(go.Scatter(
+            x=[hn_s], y=[r1_s], mode="markers+text",
+            text=["P*"], textposition="top right",
+            textfont=dict(size=11, color="red"),
+            marker=dict(size=13, color="red", symbol="star",
+                        line=dict(color="black", width=1.5)),
+            name="P*",
+        ))
+
     fig.update_layout(
-        title=dict(text=titulo,font=dict(size=14,color="#1565c0")),
-        xaxis=dict(title="HN (mm)",gridcolor="#e0e0e0",
-                   range=[xlo,xhi], constrain="domain"),
-        yaxis=dict(title="r1 (V/U)",gridcolor="#e0e0e0",
-                   range=[ylo,yhi], scaleanchor="x", scaleratio=1, constrain="domain"),
-        height=560, margin=dict(l=75,r=30,t=60,b=75),
-        paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="#fafafa",
-        legend=dict(bgcolor="rgba(255,255,255,0.85)"))
+        title=dict(text=titulo, font=dict(size=14, color="#1565c0"), x=0.0),
+        xaxis=dict(title="HN (mm)", gridcolor="#e0e0e0",
+                   range=[xlo, xhi], constrain="domain"),
+        yaxis=dict(title="r1 (V/U)", gridcolor="#e0e0e0",
+                   range=[ylo, yhi], constrain="domain"),
+        height=total_h,
+        margin=dict(l=ML, r=MR, t=MT, b=MB),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#fafafa",
+        legend=dict(
+            bgcolor="rgba(255,255,255,0.88)", bordercolor="#ccc", borderwidth=1,
+            yanchor="bottom", y=0.01, xanchor="left", x=0.01,
+        ),
+    )
     return fig
 
 
@@ -541,6 +576,28 @@ if executar or "res" in st.session_state:
             opt_hastes  = oc4.checkbox("📌 Hastes até superfície",value=False, key="opt_hastes",
                                         help="Linha tracejada vermelha de cada ponto até a superfície ajustada")
 
+            st.markdown("**🎨 Paleta de cores da superfície**")
+            # Apenas paletas com contraste máx/mín nítido e sem branco no meio
+            PALETAS_3D = {
+                "🌋 Turbo":         "Turbo",      # azul escuro → verde → amarelo → vermelho
+                "🔥 Inferno":       "Inferno",    # preto → roxo → laranja → amarelo
+                "🌊 Viridis":       "Viridis",    # roxo escuro → azul → verde → amarelo
+                "⚡ Plasma":        "Plasma",     # roxo → magenta → laranja → amarelo
+                "🌈 Jet":           "Jet",        # azul → ciano → verde → amarelo → vermelho
+                "🟥 YlOrRd":        "YlOrRd",    # amarelo → laranja → vermelho escuro
+                "🟦 Blues (inv.)":  "Blues_r",   # branco→azul invertido: azul escuro → claro
+                "🟩 YlGn":          "YlGn",      # amarelo → verde escuro
+                "🎯 Hot":           "Hot",        # preto → vermelho → amarelo
+                "🔬 Cividis":       "Cividis",   # azul escuro → verde amarelado (daltônico)
+            }
+            pc1, pc2 = st.columns([2,2])
+            pal_rsm  = pc1.selectbox("RSM / Lado esq.",  list(PALETAS_3D.keys()),
+                                      index=0, key="pal_rsm")
+            pal_krig = pc2.selectbox("Kriging / Lado dir.", list(PALETAS_3D.keys()),
+                                      index=4, key="pal_krig")
+            cs_rsm  = PALETAS_3D[pal_rsm]
+            cs_krig = PALETAS_3D[pal_krig]
+
             # Sliders de câmera (usados quando lock está ativo)
             if opt_lock:
                 st.markdown("**Ângulo da câmera sincronizada:**")
@@ -561,31 +618,36 @@ if executar or "res" in st.session_state:
         if modo=="RSM":
             st.plotly_chart(fig3d(d["HG"],d["RG"],d["Zr"],f"RSM — {resposta_sel}",
                 resposta_sel,unid,d["HN"],d["R"],d["y"],d["casos"],
-                hn_novo,r1_novo,d["yrl"],cs="Blues",**kw3d),
+                hn_novo,r1_novo,d["yrl"],cs=cs_rsm,**kw3d),
                 use_container_width=True,config={"scrollZoom":True})
 
         elif modo==f"Kriging ({d['kname']})":
             st.plotly_chart(fig3d(d["HG"],d["RG"],d["Zk"],
                 f"Kriging [{d['kname']}] — {resposta_sel}",
                 resposta_sel,unid,d["HN"],d["R"],d["y"],d["casos"],
-                hn_novo,r1_novo,d["ykl"],cs="Reds",**kw3d),
+                hn_novo,r1_novo,d["ykl"],cs=cs_krig,**kw3d),
                 use_container_width=True,config={"scrollZoom":True})
 
         elif modo=="Lado a lado":
             if opt_lock:
-                st.info("🔒 Câmera sincronizada — ambos os gráficos partem do mesmo ponto de vista. "
-                        "Ajuste a câmera em qualquer um e re-execute para fixar o ângulo desejado.")
+                st.info(
+                    "🔒 **Câmera sincronizada** — use os sliders X/Y/Z abaixo para definir "
+                    "o ângulo de visão. Ambos os gráficos são renderizados com exatamente "
+                    "o mesmo ponto de vista, ideal para figuras de artigo. "
+                    "*(O Streamlit não captura rotações feitas com o mouse — "
+                    "os sliders são a forma de controlar o ângulo com precisão.)*"
+                )
             c1,c2=st.columns(2)
             cam = cam_lock if opt_lock else None
             with c1:
                 st.plotly_chart(fig3d(d["HG"],d["RG"],d["Zr"],f"RSM — {resposta_sel}",
                     resposta_sel,unid,d["HN"],d["R"],d["y"],d["casos"],
-                    hn_novo,r1_novo,d["yrl"],cs="Blues",camera_eye=cam,**kw3d),
+                    hn_novo,r1_novo,d["yrl"],cs=cs_rsm,camera_eye=cam,**kw3d),
                     use_container_width=True,config={"scrollZoom":True})
             with c2:
                 st.plotly_chart(fig3d(d["HG"],d["RG"],d["Zk"],f"Kriging — {resposta_sel}",
                     resposta_sel,unid,d["HN"],d["R"],d["y"],d["casos"],
-                    hn_novo,r1_novo,d["ykl"],cs="Reds",camera_eye=cam,**kw3d),
+                    hn_novo,r1_novo,d["ykl"],cs=cs_krig,camera_eye=cam,**kw3d),
                     use_container_width=True,config={"scrollZoom":True})
 
         else:  # Incerteza σ
