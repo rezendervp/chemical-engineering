@@ -233,79 +233,121 @@ def fig3d(HG,RG,Z,titulo,resp,unid,HN,R,y,casos,
           camera_eye=None):
     """
     Superfície 3D com opções de customização:
-      show_grid    — grade nos planos de fundo
-      show_spheres — volume esférico semitransparente em cada ponto
-      show_stems   — linha vertical tracejada de cada ponto até a superfície
-      camera_eye   — dict(x,y,z) para posição da câmera (lock externo)
+      show_grid    — grade NA superfície (wireframe leve), caixa sempre visível
+      show_spheres — shading esférico sobre cada ponto (ilusão 3D real)
+      show_stems   — linha tracejada vermelha de cada ponto até a superfície
+      camera_eye   — dict(x,y,z) para câmera sincronizada
     """
-    fig=go.Figure()
+    fig = go.Figure()
 
-    # ── Grade ──────────────────────────────────────────────────────
-    grid_kw = dict(showgrid=show_grid, showticklabels=True, zeroline=False,
-                   backgroundcolor="#f4f6fb" if show_grid else "rgba(0,0,0,0)",
-                   showbackground=show_grid,
-                   gridcolor="#d0d8e8" if show_grid else "rgba(0,0,0,0)")
-    ax_kw = {k: dict(title=t, **grid_kw)
-             for k, t in [("xaxis","HN (mm)"),("yaxis","r1 (V/U)"),
-                          ("zaxis",f"{resp} ({unid})")]}
+    # ── Eixos: caixa sempre ligada, grade da superfície opcional ──
+    ax_base = dict(showticklabels=True, zeroline=False,
+                   backgroundcolor="#f0f3f8", showbackground=True,
+                   gridcolor="#c8d0e0")
+    ax_kw = {
+        "xaxis": dict(title="HN (mm)",   **ax_base),
+        "yaxis": dict(title="r1 (V/U)",  **ax_base),
+        "zaxis": dict(title=f"{resp} ({unid})", **ax_base),
+    }
 
-    # ── Superfície ────────────────────────────────────────────────
-    kw=dict(opacity=0.83,colorscale=cs,showscale=True,
-            lighting=dict(ambient=0.6,diffuse=0.8,specular=0.3,roughness=0.5),
-            colorbar=dict(title=f"{resp}<br>({unid})",thickness=14,len=0.7))
+    # ── Superfície principal ──────────────────────────────────────
+    # Iluminação suave: ambient alto, specular baixo → sem regiões estouradas
+    surf_kw = dict(
+        opacity   = 0.88,
+        colorscale= cs,
+        showscale = True,
+        lighting  = dict(ambient=0.75, diffuse=0.55, specular=0.08,
+                         roughness=0.85, fresnel=0.1),
+        lightposition = dict(x=100, y=200, z=300),
+        colorbar  = dict(title=f"{resp}<br>({unid})", thickness=14, len=0.70),
+    )
     if sc is not None:
-        kw["surfacecolor"]=sc; kw["colorbar"]["title"]="σ"
-    fig.add_trace(go.Surface(x=HG,y=RG,z=Z,**kw))
+        surf_kw["surfacecolor"] = sc
+        surf_kw["colorbar"]["title"] = "σ"
 
-    # ── Pontos experimentais ──────────────────────────────────────
-    fig.add_trace(go.Scatter3d(x=HN,y=R,z=y,mode="markers+text",
-        text=[str(c) for c in casos],textposition="top center",
-        textfont=dict(size=9,color="black"),
-        marker=dict(size=6,color="white",line=dict(color="black",width=2)),
-        name="Experimental",
-        hovertemplate="<b>%{text}</b><br>HN=%{x:.2f}<br>r1=%{y:.3f}<br>y=%{z:.4f}<extra></extra>"))
+    # Grade NA superfície: contorno de nível leve em branco semitransparente
+    if show_grid:
+        surf_kw["contours"] = dict(
+            x=dict(show=True, color="rgba(255,255,255,0.25)", width=1),
+            y=dict(show=True, color="rgba(255,255,255,0.25)", width=1),
+            z=dict(show=False),
+        )
+    fig.add_trace(go.Surface(x=HG, y=RG, z=Z, **surf_kw))
 
-    # ── Esferas semitransparentes ─────────────────────────────────
+    # ── Pontos experimentais com shading esférico ─────────────────
+    # Shading via colorscale radial: centro claro → borda escura
+    # dá ilusão de esfera sem adicionar geometria extra
+    sphere_cs = [
+        [0.0, "rgba(255,255,255,0.95)"],   # centro: branco brilhante
+        [0.4, "rgba(220,230,255,0.80)"],   # meio: azul claro
+        [1.0, "rgba(60,100,180,0.40)"],    # borda: azul escuro transparente
+    ] if show_spheres else None
+
     if show_spheres:
-        r_sph = (Z.max()-Z.min())*0.03   # raio proporcional à escala Z
-        for xi,ri,zi in zip(HN,R,y):
-            u_,v_ = np.mgrid[0:2*np.pi:12j, 0:np.pi:8j]
-            sx = xi + r_sph*np.cos(u_)*np.sin(v_)*0.8
-            sy = ri + r_sph*np.sin(u_)*np.sin(v_)*0.3
-            sz = zi + r_sph*np.cos(v_)
-            fig.add_trace(go.Surface(x=sx,y=sy,z=sz,
-                colorscale=[[0,"rgba(255,165,0,0.18)"],[1,"rgba(255,120,0,0.35)"]],
-                showscale=False,showlegend=False,hoverinfo="skip"))
+        # Um Scatter3d por ponto, com símbolo circle e colorscale simulando esfera
+        for xi, ri, zi, ci in zip(HN, R, y, casos):
+            fig.add_trace(go.Scatter3d(
+                x=[xi], y=[ri], z=[zi], mode="markers",
+                marker=dict(
+                    size=16,
+                    color=[0.3],           # posição no colorscale (parte clara)
+                    colorscale=sphere_cs,
+                    opacity=0.75,
+                    line=dict(color="rgba(40,80,160,0.6)", width=1.5),
+                ),
+                showlegend=False, hoverinfo="skip",
+            ))
+        # Pontos principais (brancos com borda) por cima
+        fig.add_trace(go.Scatter3d(x=HN, y=R, z=y, mode="markers+text",
+            text=[str(c) for c in casos], textposition="top center",
+            textfont=dict(size=9, color="black"),
+            marker=dict(size=6, color="white", line=dict(color="#1a3a7a", width=2)),
+            name="Experimental",
+            hovertemplate="<b>%{text}</b><br>HN=%{x:.2f}<br>r1=%{y:.3f}<br>y=%{z:.4f}<extra></extra>"))
+    else:
+        fig.add_trace(go.Scatter3d(x=HN, y=R, z=y, mode="markers+text",
+            text=[str(c) for c in casos], textposition="top center",
+            textfont=dict(size=9, color="black"),
+            marker=dict(size=7, color="white", line=dict(color="black", width=2)),
+            name="Experimental",
+            hovertemplate="<b>%{text}</b><br>HN=%{x:.2f}<br>r1=%{y:.3f}<br>y=%{z:.4f}<extra></extra>"))
 
-    # ── Hastes verticais (stems) até a superfície ─────────────────
+    # ── Hastes verticais até a superfície ────────────────────────
     if show_stems:
-        # Para cada ponto exp, achar z da superfície interpolada na mesma (HN,r1)
         from scipy.interpolate import RegularGridInterpolator
         interp_fn = RegularGridInterpolator(
-            (HG[0], RG[:,0]), Z.T, method="linear", bounds_error=False, fill_value=None)
-        for xi,ri,zi in zip(HN,R,y):
-            z_surf = float(interp_fn([[xi,ri]])[0])
-            fig.add_trace(go.Scatter3d(
-                x=[xi,xi], y=[ri,ri], z=[zi, z_surf],
-                mode="lines",
-                line=dict(color="red",width=3,dash="dash"),
-                showlegend=False, hoverinfo="skip"))
+            (HG[0], RG[:,0]), Z.T, method="linear",
+            bounds_error=False, fill_value=None)
+        xs_all, ys_all, zs_all = [], [], []
+        for xi, ri, zi in zip(HN, R, y):
+            z_surf = float(interp_fn([[xi, ri]])[0])
+            xs_all += [xi, xi, None]
+            ys_all += [ri, ri, None]
+            zs_all += [zi, z_surf, None]
+        fig.add_trace(go.Scatter3d(
+            x=xs_all, y=ys_all, z=zs_all,
+            mode="lines",
+            line=dict(color="red", width=2.5, dash="dash"),
+            name="Haste → superfície",
+            hoverinfo="skip",
+        ))
 
-    # ── Ponto P* ──────────────────────────────────────────────────
+    # ── Ponto P* ─────────────────────────────────────────────────
     if hn_s is not None:
-        fig.add_trace(go.Scatter3d(x=[hn_s],y=[r1_s],z=[y_s],mode="markers",
-            marker=dict(size=10,color="red",symbol="diamond",
-                        line=dict(color="black",width=1.5)),
+        fig.add_trace(go.Scatter3d(
+            x=[hn_s], y=[r1_s], z=[y_s], mode="markers",
+            marker=dict(size=10, color="red", symbol="diamond",
+                        line=dict(color="black", width=1.5)),
             name="P*",
             hovertemplate=f"P*<br>HN={hn_s:.2f}<br>r1={r1_s:.3f}<br>y={y_s:.4f}<extra></extra>"))
 
-    eye = camera_eye if camera_eye else dict(x=1.6,y=-1.6,z=1.2)
+    eye = camera_eye if camera_eye else dict(x=1.6, y=-1.6, z=1.2)
     fig.update_layout(
-        title=dict(text=titulo,font=dict(size=15,color="#1565c0")),
+        title=dict(text=titulo, font=dict(size=15, color="#1565c0")),
         scene=dict(camera=dict(eye=eye), aspectmode="auto", **ax_kw),
-        height=600,margin=dict(l=0,r=0,t=55,b=0),
-        legend=dict(yanchor="top",y=0.97,xanchor="left",x=0.01,
-                    bgcolor="rgba(255,255,255,0.85)",bordercolor="#ccc",borderwidth=1),
+        height=610, margin=dict(l=0, r=0, t=58, b=0),
+        legend=dict(yanchor="top", y=0.97, xanchor="left", x=0.01,
+                    bgcolor="rgba(255,255,255,0.85)", bordercolor="#ccc", borderwidth=1),
         paper_bgcolor="rgba(0,0,0,0)")
     return fig
 
@@ -323,14 +365,18 @@ def fig_cont(HG,RG,Z,titulo,resp,unid,HN,R,casos,hn_s=None,r1_s=None,cs="Jet"):
         fig.add_trace(go.Scatter(x=[hn_s],y=[r1_s],mode="markers+text",
             text=["P*"],textposition="top right",textfont=dict(size=11,color="red"),
             marker=dict(size=14,color="red",symbol="star",line=dict(color="black",width=1.5)),name="P*"))
-    # Aspecto equalizado: evita distorção entre escalas de HN e r1
-    hs=float(HG[0].max()-HG[0].min()); rs=float(RG[:,0].max()-RG[:,0].min())
-    ratio=rs/hs if hs>0 else 1.0
+    # Aspecto 1:1 real — mesmo mecanismo do parity plot que funcionou
+    xvals = HG[0]; yvals = RG[:,0]
+    xpad = (xvals.max()-xvals.min())*0.05; ypad = (yvals.max()-yvals.min())*0.05
+    xlo=xvals.min()-xpad; xhi=xvals.max()+xpad
+    ylo=yvals.min()-ypad; yhi=yvals.max()+ypad
     fig.update_layout(
         title=dict(text=titulo,font=dict(size=14,color="#1565c0")),
-        xaxis=dict(title="HN (mm)",gridcolor="#e0e0e0",scaleanchor="y",scaleratio=ratio),
-        yaxis=dict(title="r1 (V/U)",gridcolor="#e0e0e0"),
-        height=520,margin=dict(l=65,r=40,t=55,b=60),
+        xaxis=dict(title="HN (mm)",gridcolor="#e0e0e0",
+                   range=[xlo,xhi], constrain="domain"),
+        yaxis=dict(title="r1 (V/U)",gridcolor="#e0e0e0",
+                   range=[ylo,yhi], scaleanchor="x", scaleratio=1, constrain="domain"),
+        height=560, margin=dict(l=75,r=30,t=60,b=75),
         paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="#fafafa",
         legend=dict(bgcolor="rgba(255,255,255,0.85)"))
     return fig
@@ -486,19 +532,26 @@ if executar or "res" in st.session_state:
         # ── Opções de customização 3D ──────────────────────────────────────────
         with st.expander("⚙️ Opções de visualização 3D", expanded=True):
             oc1,oc2,oc3,oc4 = st.columns(4)
-            opt_grade   = oc1.checkbox("📐 Grade",          value=True,  key="opt_grade",
-                                        help="Mostrar/ocultar grade nos planos de fundo")
-            opt_lock    = oc2.checkbox("🔒 Sincronizar câmera", value=False, key="opt_lock",
-                                        help="Modo 'Lado a lado': ambos os gráficos giram juntos com o mesmo ponto de vista")
-            opt_esferas = oc3.checkbox("🔵 Esferas nos pontos", value=False, key="opt_esferas",
-                                        help="Volume esférico semitransparente em cada ponto experimental")
-            opt_hastes  = oc4.checkbox("📌 Hastes até superfície", value=False, key="opt_hastes",
-                                        help="Linha vertical tracejada vermelha de cada ponto experimental até a superfície ajustada")
+            opt_grade   = oc1.checkbox("📐 Grade na superfície", value=False, key="opt_grade",
+                                        help="Linhas de wireframe suaves sobre a superfície")
+            opt_lock    = oc2.checkbox("🔒 Sincronizar câmera",  value=False, key="opt_lock",
+                                        help="Lado a lado: mesmo ângulo fixo nos dois gráficos")
+            opt_esferas = oc3.checkbox("🔵 Shading esférico",    value=False, key="opt_esferas",
+                                        help="Adiciona halo com gradiente radial em cada ponto, simulando volume esférico")
+            opt_hastes  = oc4.checkbox("📌 Hastes até superfície",value=False, key="opt_hastes",
+                                        help="Linha tracejada vermelha de cada ponto até a superfície ajustada")
 
-        # Câmera compartilhada (para lock)
-        cam_lock = dict(x=1.6, y=-1.6, z=1.2)
+            # Sliders de câmera (usados quando lock está ativo)
+            if opt_lock:
+                st.markdown("**Ângulo da câmera sincronizada:**")
+                sc1,sc2,sc3 = st.columns(3)
+                cam_x = sc1.slider("X",  min_value=-3.0, max_value=3.0, value=1.6,  step=0.1, key="cam_x")
+                cam_y = sc2.slider("Y",  min_value=-3.0, max_value=3.0, value=-1.6, step=0.1, key="cam_y")
+                cam_z = sc3.slider("Z",  min_value= 0.2, max_value=3.0, value=1.2,  step=0.1, key="cam_z")
+                cam_lock = dict(x=cam_x, y=cam_y, z=cam_z)
+            else:
+                cam_lock = dict(x=1.6, y=-1.6, z=1.2)
 
-        # Kwargs comuns para todas as chamadas fig3d
         kw3d = dict(
             show_grid    = opt_grade,
             show_spheres = opt_esferas,
@@ -544,11 +597,31 @@ if executar or "res" in st.session_state:
     # ── ABA 2: Contornos ──────────────────────────────────────────────────────
     with tabs[1]:
         st.markdown("### 🗺️ Mapas de Contorno 2D")
-        st.caption("Aspecto equalizado — proporção real entre HN e r1 sem distorção")
-        opcoes={"RSM":(d["Zr"],"Jet"),f"Kriging ({d['kname']})":(d["Zk"],"Jet"),
-                "Incerteza σ":(d["Zs"],"Viridis"),"Diferença (Kriging−RSM)":(d["Zd"],"RdBu")}
-        mc=st.radio("Mapa:",list(opcoes.keys()),horizontal=True,key="mc")
-        Zsel,cssel=opcoes[mc]
+        st.caption("Aspecto 1:1 — proporção real entre HN e r1")
+
+        ca, cb = st.columns([3,1])
+        with ca:
+            opcoes_cont = ["RSM", f"Kriging ({d['kname']})", "Incerteza σ", "Diferença (Kriging−RSM)"]
+            mc = st.radio("Mapa:", opcoes_cont, horizontal=True, key="mc")
+        with cb:
+            PALETAS = {
+                "🌈 Jet":        "Jet",
+                "🔥 Inferno":    "Inferno",
+                "🌊 Viridis":    "Viridis",
+                "🎨 RdBu":       "RdBu",
+                "🟫 YlOrRd":     "YlOrRd",
+            }
+            paleta_nome = st.selectbox("Paleta de cores", list(PALETAS.keys()), key="paleta_cont")
+            cs_custom = PALETAS[paleta_nome]
+
+        # Mapa de Z: usa paleta escolhida para RSM e Kriging; fixa Viridis/RdBu para σ e diff
+        Z_map = {
+            "RSM":                        (d["Zr"], cs_custom),
+            f"Kriging ({d['kname']})":    (d["Zk"], cs_custom),
+            "Incerteza σ":                (d["Zs"], "Viridis"),
+            "Diferença (Kriging−RSM)":    (d["Zd"], "RdBu"),
+        }
+        Zsel, cssel = Z_map[mc]
         st.plotly_chart(fig_cont(d["HG"],d["RG"],Zsel,
             f"{mc} — {resposta_sel} ({unid})",resposta_sel,unid,
             d["HN"],d["R"],d["casos"],hn_novo,r1_novo,cssel),
