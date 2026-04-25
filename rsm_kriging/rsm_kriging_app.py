@@ -673,10 +673,12 @@ if executar or "res" in st.session_state:
             "Diferença (Kriging−RSM)":    (d["Zd"], "RdBu"),
         }
         Zsel, cssel = Z_map[mc]
-        st.plotly_chart(fig_cont(d["HG"],d["RG"],Zsel,
-            f"{mc} — {resposta_sel} ({unid})",resposta_sel,unid,
-            d["HN"],d["R"],d["casos"],hn_novo,r1_novo,cssel),
-            use_container_width=False)
+        _l, _mid, _r = st.columns([1, 2, 1])
+        with _mid:
+            st.plotly_chart(fig_cont(d["HG"],d["RG"],Zsel,
+                f"{mc} — {resposta_sel} ({unid})",resposta_sel,unid,
+                d["HN"],d["R"],d["casos"],hn_novo,r1_novo,cssel),
+                use_container_width=False)
 
     # ── ABA 3: Parity ─────────────────────────────────────────────────────────
     with tabs[2]:
