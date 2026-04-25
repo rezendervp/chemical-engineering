@@ -289,7 +289,7 @@ def fig3d(HG,RG,Z,titulo,resp,unid,HN,R,y,casos,
             fig.add_trace(go.Scatter3d(
                 x=[xi], y=[ri], z=[zi], mode="markers",
                 marker=dict(
-                    size=16,
+                    size=12,
                     color=[0.3],           # posição no colorscale (parte clara)
                     colorscale=sphere_cs,
                     opacity=0.75,
