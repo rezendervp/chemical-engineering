@@ -48,6 +48,7 @@ html,body,[class*="css"]{font-family:'Segoe UI',sans-serif;}
 .stTabs [aria-selected="true"]{background:#1565c0!important;color:white!important;}
 .stButton>button{background:linear-gradient(90deg,#1565c0,#283593);color:white;
   border:none;border-radius:8px;padding:.6rem 1.4rem;font-weight:600;font-size:1rem;width:100%;}
+[data-testid="stPlotlyChart"]:has(div.js-plotly-plot){display:flex;justify-content:center;}
 </style>
 """, unsafe_allow_html=True)
 
