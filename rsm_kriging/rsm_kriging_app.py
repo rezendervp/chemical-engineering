@@ -228,30 +228,82 @@ def rodar(df_bytes, resp, kname, hn0, r10):
 # ── Plotagem ─────────────────────────────────────────────────────────────────
 
 def fig3d(HG,RG,Z,titulo,resp,unid,HN,R,y,casos,
-          hn_s=None,r1_s=None,y_s=None,cs="Blues",sc=None):
+          hn_s=None,r1_s=None,y_s=None,cs="Blues",sc=None,
+          show_grid=True,show_spheres=False,show_stems=False,
+          camera_eye=None):
+    """
+    Superfície 3D com opções de customização:
+      show_grid    — grade nos planos de fundo
+      show_spheres — volume esférico semitransparente em cada ponto
+      show_stems   — linha vertical tracejada de cada ponto até a superfície
+      camera_eye   — dict(x,y,z) para posição da câmera (lock externo)
+    """
     fig=go.Figure()
+
+    # ── Grade ──────────────────────────────────────────────────────
+    grid_kw = dict(showgrid=show_grid, showticklabels=True, zeroline=False,
+                   backgroundcolor="#f4f6fb" if show_grid else "rgba(0,0,0,0)",
+                   showbackground=show_grid,
+                   gridcolor="#d0d8e8" if show_grid else "rgba(0,0,0,0)")
+    ax_kw = {k: dict(title=t, **grid_kw)
+             for k, t in [("xaxis","HN (mm)"),("yaxis","r1 (V/U)"),
+                          ("zaxis",f"{resp} ({unid})")]}
+
+    # ── Superfície ────────────────────────────────────────────────
     kw=dict(opacity=0.83,colorscale=cs,showscale=True,
             lighting=dict(ambient=0.6,diffuse=0.8,specular=0.3,roughness=0.5),
             colorbar=dict(title=f"{resp}<br>({unid})",thickness=14,len=0.7))
-    if sc is not None: kw["surfacecolor"]=sc; kw["colorbar"]["title"]="σ"
+    if sc is not None:
+        kw["surfacecolor"]=sc; kw["colorbar"]["title"]="σ"
     fig.add_trace(go.Surface(x=HG,y=RG,z=Z,**kw))
+
+    # ── Pontos experimentais ──────────────────────────────────────
     fig.add_trace(go.Scatter3d(x=HN,y=R,z=y,mode="markers+text",
         text=[str(c) for c in casos],textposition="top center",
         textfont=dict(size=9,color="black"),
-        marker=dict(size=6,color="white",line=dict(color="black",width=2)),name="Experimental",
+        marker=dict(size=6,color="white",line=dict(color="black",width=2)),
+        name="Experimental",
         hovertemplate="<b>%{text}</b><br>HN=%{x:.2f}<br>r1=%{y:.3f}<br>y=%{z:.4f}<extra></extra>"))
+
+    # ── Esferas semitransparentes ─────────────────────────────────
+    if show_spheres:
+        r_sph = (Z.max()-Z.min())*0.03   # raio proporcional à escala Z
+        for xi,ri,zi in zip(HN,R,y):
+            u_,v_ = np.mgrid[0:2*np.pi:12j, 0:np.pi:8j]
+            sx = xi + r_sph*np.cos(u_)*np.sin(v_)*0.8
+            sy = ri + r_sph*np.sin(u_)*np.sin(v_)*0.3
+            sz = zi + r_sph*np.cos(v_)
+            fig.add_trace(go.Surface(x=sx,y=sy,z=sz,
+                colorscale=[[0,"rgba(255,165,0,0.18)"],[1,"rgba(255,120,0,0.35)"]],
+                showscale=False,showlegend=False,hoverinfo="skip"))
+
+    # ── Hastes verticais (stems) até a superfície ─────────────────
+    if show_stems:
+        # Para cada ponto exp, achar z da superfície interpolada na mesma (HN,r1)
+        from scipy.interpolate import RegularGridInterpolator
+        interp_fn = RegularGridInterpolator(
+            (HG[0], RG[:,0]), Z.T, method="linear", bounds_error=False, fill_value=None)
+        for xi,ri,zi in zip(HN,R,y):
+            z_surf = float(interp_fn([[xi,ri]])[0])
+            fig.add_trace(go.Scatter3d(
+                x=[xi,xi], y=[ri,ri], z=[zi, z_surf],
+                mode="lines",
+                line=dict(color="red",width=3,dash="dash"),
+                showlegend=False, hoverinfo="skip"))
+
+    # ── Ponto P* ──────────────────────────────────────────────────
     if hn_s is not None:
         fig.add_trace(go.Scatter3d(x=[hn_s],y=[r1_s],z=[y_s],mode="markers",
-            marker=dict(size=10,color="red",symbol="diamond",line=dict(color="black",width=1.5)),
-            name="P*",hovertemplate=f"P*<br>HN={hn_s:.2f}<br>r1={r1_s:.3f}<br>y={y_s:.4f}<extra></extra>"))
+            marker=dict(size=10,color="red",symbol="diamond",
+                        line=dict(color="black",width=1.5)),
+            name="P*",
+            hovertemplate=f"P*<br>HN={hn_s:.2f}<br>r1={r1_s:.3f}<br>y={y_s:.4f}<extra></extra>"))
+
+    eye = camera_eye if camera_eye else dict(x=1.6,y=-1.6,z=1.2)
     fig.update_layout(
         title=dict(text=titulo,font=dict(size=15,color="#1565c0")),
-        scene=dict(
-            xaxis=dict(title="HN (mm)",backgroundcolor="#f4f6fb",gridcolor="#d0d8e8",showbackground=True),
-            yaxis=dict(title="r1 (V/U)",backgroundcolor="#f4f6fb",gridcolor="#d0d8e8",showbackground=True),
-            zaxis=dict(title=f"{resp} ({unid})",backgroundcolor="#f4f6fb",gridcolor="#d0d8e8",showbackground=True),
-            camera=dict(eye=dict(x=1.6,y=-1.6,z=1.2)),aspectmode="auto"),
-        height=580,margin=dict(l=0,r=0,t=55,b=0),
+        scene=dict(camera=dict(eye=eye), aspectmode="auto", **ax_kw),
+        height=600,margin=dict(l=0,r=0,t=55,b=0),
         legend=dict(yanchor="top",y=0.97,xanchor="left",x=0.01,
                     bgcolor="rgba(255,255,255,0.85)",bordercolor="#ccc",borderwidth=1),
         paper_bgcolor="rgba(0,0,0,0)")
@@ -285,7 +337,11 @@ def fig_cont(HG,RG,Z,titulo,resp,unid,HN,R,casos,hn_s=None,r1_s=None,cs="Jet"):
 
 
 def fig_parity(yobs,ypr,ypk,r2r,r2k,resp,unid,modo):
-    av=np.concatenate([yobs,ypr,ypk]); lims=[av.min()*0.97,av.max()*1.03]
+    # Range igual em X e Y: sem espaço vazio lateral
+    av  = np.concatenate([yobs,ypr,ypk])
+    pad = (av.max()-av.min())*0.05
+    lo  = av.min()-pad; hi = av.max()+pad
+    lims= [lo, hi]
     fig=go.Figure()
     fig.add_trace(go.Scatter(x=lims,y=lims,mode="lines",
         line=dict(color="black",dash="dash",width=2),showlegend=False,hoverinfo="skip"))
@@ -297,11 +353,15 @@ def fig_parity(yobs,ypr,ypk,r2r,r2k,resp,unid,modo):
         hovertemplate="Obs=%{x:.4f}<br>Pred=%{y:.4f}<extra>Kriging</extra>"))
     fig.update_layout(
         title=dict(text=f"Parity Plot — {modo} | {resp} ({unid})",font=dict(size=14,color="#1565c0")),
-        xaxis=dict(title=f"{resp} observado ({unid})",gridcolor="#e0e0e0",scaleanchor="y"),
-        yaxis=dict(title=f"{resp} predito ({unid})",gridcolor="#e0e0e0"),
-        height=470,margin=dict(l=65,r=40,t=55,b=60),
+        xaxis=dict(title=f"{resp} observado ({unid})",gridcolor="#e0e0e0",
+                   range=lims, constrain="domain"),
+        yaxis=dict(title=f"{resp} predito ({unid})",gridcolor="#e0e0e0",
+                   range=lims, scaleanchor="x", scaleratio=1, constrain="domain"),
+        height=520,
+        margin=dict(l=75,r=30,t=60,b=75),
         paper_bgcolor="rgba(0,0,0,0)",plot_bgcolor="#fafafa",
-        legend=dict(bgcolor="rgba(255,255,255,0.85)"))
+        legend=dict(bgcolor="rgba(255,255,255,0.85)",
+                    yanchor="top",y=0.97,xanchor="left",x=0.03))
     return fig
 
 
@@ -418,35 +478,67 @@ if executar or "res" in st.session_state:
     with tabs[0]:
         st.markdown("### 🌐 Superfícies 3D Interativas")
         st.caption("Arraste para rotacionar · Scroll para zoom · Duplo clique para resetar câmera")
+
+        # ── Seletor de superfície ──────────────────────────────────────────────
         modo=st.radio("Exibir:",["RSM",f"Kriging ({d['kname']})","Lado a lado","Incerteza σ"],
                       horizontal=True,key="m3d")
+
+        # ── Opções de customização 3D ──────────────────────────────────────────
+        with st.expander("⚙️ Opções de visualização 3D", expanded=True):
+            oc1,oc2,oc3,oc4 = st.columns(4)
+            opt_grade   = oc1.checkbox("📐 Grade",          value=True,  key="opt_grade",
+                                        help="Mostrar/ocultar grade nos planos de fundo")
+            opt_lock    = oc2.checkbox("🔒 Sincronizar câmera", value=False, key="opt_lock",
+                                        help="Modo 'Lado a lado': ambos os gráficos giram juntos com o mesmo ponto de vista")
+            opt_esferas = oc3.checkbox("🔵 Esferas nos pontos", value=False, key="opt_esferas",
+                                        help="Volume esférico semitransparente em cada ponto experimental")
+            opt_hastes  = oc4.checkbox("📌 Hastes até superfície", value=False, key="opt_hastes",
+                                        help="Linha vertical tracejada vermelha de cada ponto experimental até a superfície ajustada")
+
+        # Câmera compartilhada (para lock)
+        cam_lock = dict(x=1.6, y=-1.6, z=1.2)
+
+        # Kwargs comuns para todas as chamadas fig3d
+        kw3d = dict(
+            show_grid    = opt_grade,
+            show_spheres = opt_esferas,
+            show_stems   = opt_hastes,
+        )
+
         if modo=="RSM":
             st.plotly_chart(fig3d(d["HG"],d["RG"],d["Zr"],f"RSM — {resposta_sel}",
                 resposta_sel,unid,d["HN"],d["R"],d["y"],d["casos"],
-                hn_novo,r1_novo,d["yrl"],cs="Blues"),
+                hn_novo,r1_novo,d["yrl"],cs="Blues",**kw3d),
                 use_container_width=True,config={"scrollZoom":True})
+
         elif modo==f"Kriging ({d['kname']})":
             st.plotly_chart(fig3d(d["HG"],d["RG"],d["Zk"],
                 f"Kriging [{d['kname']}] — {resposta_sel}",
                 resposta_sel,unid,d["HN"],d["R"],d["y"],d["casos"],
-                hn_novo,r1_novo,d["ykl"],cs="Reds"),
+                hn_novo,r1_novo,d["ykl"],cs="Reds",**kw3d),
                 use_container_width=True,config={"scrollZoom":True})
+
         elif modo=="Lado a lado":
+            if opt_lock:
+                st.info("🔒 Câmera sincronizada — ambos os gráficos partem do mesmo ponto de vista. "
+                        "Ajuste a câmera em qualquer um e re-execute para fixar o ângulo desejado.")
             c1,c2=st.columns(2)
+            cam = cam_lock if opt_lock else None
             with c1:
                 st.plotly_chart(fig3d(d["HG"],d["RG"],d["Zr"],f"RSM — {resposta_sel}",
                     resposta_sel,unid,d["HN"],d["R"],d["y"],d["casos"],
-                    hn_novo,r1_novo,d["yrl"],cs="Blues"),
+                    hn_novo,r1_novo,d["yrl"],cs="Blues",camera_eye=cam,**kw3d),
                     use_container_width=True,config={"scrollZoom":True})
             with c2:
                 st.plotly_chart(fig3d(d["HG"],d["RG"],d["Zk"],f"Kriging — {resposta_sel}",
                     resposta_sel,unid,d["HN"],d["R"],d["y"],d["casos"],
-                    hn_novo,r1_novo,d["ykl"],cs="Reds"),
+                    hn_novo,r1_novo,d["ykl"],cs="Reds",camera_eye=cam,**kw3d),
                     use_container_width=True,config={"scrollZoom":True})
-        else:
+
+        else:  # Incerteza σ
             st.plotly_chart(fig3d(d["HG"],d["RG"],d["Zk"],f"Incerteza σ — {resposta_sel}",
                 resposta_sel,unid,d["HN"],d["R"],d["y"],d["casos"],
-                hn_novo,r1_novo,d["ykl"],cs="Viridis",sc=d["Zs"]),
+                hn_novo,r1_novo,d["ykl"],cs="Viridis",sc=d["Zs"],**kw3d),
                 use_container_width=True,config={"scrollZoom":True})
 
     # ── ABA 2: Contornos ──────────────────────────────────────────────────────
