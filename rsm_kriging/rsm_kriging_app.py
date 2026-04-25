@@ -675,7 +675,7 @@ if executar or "res" in st.session_state:
         st.plotly_chart(fig_cont(d["HG"],d["RG"],Zsel,
             f"{mc} — {resposta_sel} ({unid})",resposta_sel,unid,
             d["HN"],d["R"],d["casos"],hn_novo,r1_novo,cssel),
-            use_container_width=True)
+            use_container_width=False)
 
     # ── ABA 3: Parity ─────────────────────────────────────────────────────────
     with tabs[2]:
