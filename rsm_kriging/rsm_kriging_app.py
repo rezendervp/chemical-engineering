@@ -353,85 +353,54 @@ def fig3d(HG,RG,Z,titulo,resp,unid,HN,R,y,casos,
 
 
 def fig_cont(HG,RG,Z,titulo,resp,unid,HN,R,casos,hn_s=None,r1_s=None,cs="Jet"):
-    """
-    Contorno QUADRADO fixo (550x550 px de área de plot).
-    Colorbar colada à direita, eixos com tick labels junto da borda.
-    Mesma lógica do parity plot que ficou correto.
-    """
-    fig = go.Figure()
-
     xvals = HG[0]; yvals = RG[:,0]
-    xpad  = (xvals.max()-xvals.min())*0.05
-    ypad  = (yvals.max()-yvals.min())*0.05
-    xlo = float(xvals.min())-xpad; xhi = float(xvals.max())+xpad
-    ylo = float(yvals.min())-ypad; yhi = float(yvals.max())+ypad
+    xpad  = (xvals.max()-xvals.min())*0.04
+    ypad  = (yvals.max()-yvals.min())*0.06
+    xlo=float(xvals.min())-xpad; xhi=float(xvals.max())+xpad
+    ylo=float(yvals.min())-ypad; yhi=float(yvals.max())+ypad
 
+    fig = go.Figure()
     fig.add_trace(go.Contour(
         x=xvals, y=yvals, z=Z,
-        colorscale=cs, ncontours=18, showscale=True,
+        colorscale=cs, ncontours=16, showscale=True,
         contours=dict(showlabels=True, labelfont=dict(size=8, color="black")),
         colorbar=dict(
-            title=dict(text=f"{resp} ({unid})", side="right", font=dict(size=11)),
-            thickness=18, len=1.0,
-            x=1.01, xanchor="left",
-            y=0.5,  yanchor="middle",
-            tickfont=dict(size=10),
+            thickness=15, len=0.75,
+            x=1.02, xanchor="left", y=0.5, yanchor="middle",
+            title=dict(text=f"{resp}<br>({unid})", side="right", font=dict(size=10)),
+            tickfont=dict(size=9),
         ),
     ))
     fig.add_trace(go.Scatter(
         x=HN, y=R, mode="markers+text",
         text=[str(c) for c in casos], textposition="top right",
-        textfont=dict(size=8, color="#111"),
-        marker=dict(size=9, color="white", line=dict(color="black", width=2)),
-        name="Experimental",
+        textfont=dict(size=8), name="Exp.",
+        marker=dict(size=8, color="white", line=dict(color="black", width=1.5)),
         hovertemplate="<b>%{text}</b><br>HN=%{x:.2f}<br>r1=%{y:.3f}<extra></extra>",
     ))
     if hn_s is not None:
         fig.add_trace(go.Scatter(
             x=[hn_s], y=[r1_s], mode="markers+text",
             text=["P*"], textposition="top right",
-            textfont=dict(size=11, color="red"),
-            marker=dict(size=13, color="red", symbol="star",
-                        line=dict(color="black", width=1.5)),
+            textfont=dict(size=10, color="red"),
+            marker=dict(size=12, color="red", symbol="star",
+                        line=dict(color="darkred", width=1)),
             name="P*",
         ))
-
-    # Quadrado fixo: mesmo truque do parity plot
-    # scaleanchor="x" + scaleratio=1 + range explícito igual nos dois eixos
-    # Para dados com escalas muito diferentes (HN 6-22, r1 0.3-1.6),
-    # normalizamos internamente passando dados em unidades normalizadas
-    # e colocamos tick labels customizados com os valores reais.
-    # Isso garante quadrado perfeito independente das unidades.
-
     fig.update_layout(
-        title=dict(text=titulo, font=dict(size=13, color="#1565c0")),
-        xaxis=dict(
-            title=dict(text="HN (mm)", font=dict(size=12)),
-            gridcolor="#e0e0e0", showgrid=True,
-            range=[xlo, xhi],
-            constrain="domain",
-            tickfont=dict(size=10),
-            ticks="outside", ticklen=4,
-        ),
-        yaxis=dict(
-            title=dict(text="r1 (V/U)", font=dict(size=12)),
-            gridcolor="#e0e0e0", showgrid=True,
-            range=[ylo, yhi],
-            scaleanchor="x", scaleratio=1,   # força quadrado real
-            constrain="domain",
-            tickfont=dict(size=10),
-            ticks="outside", ticklen=4,
-        ),
-        # altura = largura do plot + margens → quadrado visual
-        # com scaleanchor o Plotly ajusta o domínio menor automaticamente
-        height=620,
-        margin=dict(l=70, r=100, t=55, b=70),
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#fafafa",
-        legend=dict(
-            bgcolor="rgba(255,255,255,0.90)", bordercolor="#bbb", borderwidth=1,
-            yanchor="top", y=0.99, xanchor="left", x=0.01,
-            font=dict(size=10),
-        ),
+        title=dict(text=titulo, font=dict(size=12, color="#1565c0")),
+        width=560, height=520,
+        margin=dict(l=60, r=90, t=45, b=55),
+        xaxis=dict(title="HN (mm)", range=[xlo,xhi],
+                   tickfont=dict(size=10), gridcolor="#e0e0e0",
+                   ticks="outside", ticklen=3, linecolor="#999", mirror=True),
+        yaxis=dict(title="r1 (V/U)", range=[ylo,yhi],
+                   tickfont=dict(size=10), gridcolor="#e0e0e0",
+                   ticks="outside", ticklen=3, linecolor="#999", mirror=True),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="white",
+        legend=dict(bgcolor="rgba(255,255,255,0.9)", bordercolor="#ccc",
+                    borderwidth=1, x=0.01, y=0.99,
+                    xanchor="left", yanchor="top", font=dict(size=9)),
     )
     return fig
 
