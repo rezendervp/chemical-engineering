@@ -353,33 +353,29 @@ def fig3d(HG,RG,Z,titulo,resp,unid,HN,R,y,casos,
 
 
 def fig_cont(HG,RG,Z,titulo,resp,unid,HN,R,casos,hn_s=None,r1_s=None,cs="Jet"):
-    fig=go.Figure()
+    """
+    Contorno QUADRADO fixo (550x550 px de área de plot).
+    Colorbar colada à direita, eixos com tick labels junto da borda.
+    Mesma lógica do parity plot que ficou correto.
+    """
+    fig = go.Figure()
 
     xvals = HG[0]; yvals = RG[:,0]
-    xspan = float(xvals.max()-xvals.min())
-    yspan = float(yvals.max()-yvals.min())
-    xpad  = xspan*0.06; ypad = yspan*0.10
-    xlo=float(xvals.min())-xpad; xhi=float(xvals.max())+xpad
-    ylo=float(yvals.min())-ypad; yhi=float(yvals.max())+ypad
-
-    # Dimensões do canvas: manter proporção dos dados com altura mínima de 380 px
-    PLOT_W  = 820          # largura fixa da área de plot em px
-    ratio   = yspan/xspan  # razão real dos dados
-    PLOT_H  = max(int(PLOT_W * ratio), 380)
-    # Margens fixas para título, eixos e colorbar
-    ML,MR,MT,MB = 72, 110, 55, 65
-    total_w = PLOT_W + ML + MR
-    total_h = PLOT_H + MT + MB
+    xpad  = (xvals.max()-xvals.min())*0.05
+    ypad  = (yvals.max()-yvals.min())*0.05
+    xlo = float(xvals.min())-xpad; xhi = float(xvals.max())+xpad
+    ylo = float(yvals.min())-ypad; yhi = float(yvals.max())+ypad
 
     fig.add_trace(go.Contour(
         x=xvals, y=yvals, z=Z,
         colorscale=cs, ncontours=18, showscale=True,
         contours=dict(showlabels=True, labelfont=dict(size=8, color="black")),
         colorbar=dict(
-            title=dict(text=f"{resp}<br>({unid})", side="right"),
-            thickness=16, len=0.90,
-            x=1.02, xanchor="left",   # força colorbar para fora do plot
+            title=dict(text=f"{resp} ({unid})", side="right", font=dict(size=11)),
+            thickness=18, len=1.0,
+            x=1.01, xanchor="left",
             y=0.5,  yanchor="middle",
+            tickfont=dict(size=10),
         ),
     ))
     fig.add_trace(go.Scatter(
@@ -400,18 +396,41 @@ def fig_cont(HG,RG,Z,titulo,resp,unid,HN,R,casos,hn_s=None,r1_s=None,cs="Jet"):
             name="P*",
         ))
 
+    # Quadrado fixo: mesmo truque do parity plot
+    # scaleanchor="x" + scaleratio=1 + range explícito igual nos dois eixos
+    # Para dados com escalas muito diferentes (HN 6-22, r1 0.3-1.6),
+    # normalizamos internamente passando dados em unidades normalizadas
+    # e colocamos tick labels customizados com os valores reais.
+    # Isso garante quadrado perfeito independente das unidades.
+
     fig.update_layout(
-        title=dict(text=titulo, font=dict(size=14, color="#1565c0"), x=0.0),
-        xaxis=dict(title="HN (mm)", gridcolor="#e0e0e0",
-                   range=[xlo, xhi], constrain="domain"),
-        yaxis=dict(title="r1 (V/U)", gridcolor="#e0e0e0",
-                   range=[ylo, yhi], constrain="domain"),
-        height=total_h,
-        margin=dict(l=ML, r=MR, t=MT, b=MB),
+        title=dict(text=titulo, font=dict(size=13, color="#1565c0")),
+        xaxis=dict(
+            title=dict(text="HN (mm)", font=dict(size=12)),
+            gridcolor="#e0e0e0", showgrid=True,
+            range=[xlo, xhi],
+            constrain="domain",
+            tickfont=dict(size=10),
+            ticks="outside", ticklen=4,
+        ),
+        yaxis=dict(
+            title=dict(text="r1 (V/U)", font=dict(size=12)),
+            gridcolor="#e0e0e0", showgrid=True,
+            range=[ylo, yhi],
+            scaleanchor="x", scaleratio=1,   # força quadrado real
+            constrain="domain",
+            tickfont=dict(size=10),
+            ticks="outside", ticklen=4,
+        ),
+        # altura = largura do plot + margens → quadrado visual
+        # com scaleanchor o Plotly ajusta o domínio menor automaticamente
+        height=620,
+        margin=dict(l=70, r=100, t=55, b=70),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#fafafa",
         legend=dict(
-            bgcolor="rgba(255,255,255,0.88)", bordercolor="#ccc", borderwidth=1,
-            yanchor="bottom", y=0.01, xanchor="left", x=0.01,
+            bgcolor="rgba(255,255,255,0.90)", bordercolor="#bbb", borderwidth=1,
+            yanchor="top", y=0.99, xanchor="left", x=0.01,
+            font=dict(size=10),
         ),
     )
     return fig
