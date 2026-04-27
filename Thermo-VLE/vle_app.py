@@ -118,7 +118,7 @@ st.caption("Lei de Raoult + Equação de Antoine (NIST) — log₁₀(P/bar) = A
 with st.sidebar:
     st.header("Configuração")
 
-    st.subheader("Componente 1 (mais volátil)")
+    st.subheader("Light Key (mais volátil)")
     comp1_name = st.selectbox(
         "Componente 1", COMP_OPTIONS, index=1,
         format_func=lambda x: x if COMPONENT_GROUPS[x] is not None else x
@@ -137,7 +137,7 @@ with st.sidebar:
         st.markdown(f"**A** = {A1} | **B** = {B1} | **C** = {C1}")
         st.caption(f"T_eb (1 atm) = {d1['Tb_C']} °C")
 
-    st.subheader("Componente 2 (menos volátil)")
+    st.subheader("Heaky Key (menos volátil)")
     comp2_name = st.selectbox(
         "Componente 2", COMP_OPTIONS, index=2,
         format_func=lambda x: x if COMPONENT_GROUPS[x] is not None else x
