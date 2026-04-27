@@ -120,7 +120,7 @@ with st.sidebar:
 
     st.subheader("Light Key (mais volátil)")
     comp1_name = st.selectbox(
-        "Componente 1", COMP_OPTIONS, index=1,
+        "Light Key", COMP_OPTIONS, index=1,
         format_func=lambda x: x if COMPONENT_GROUPS[x] is not None else x
     )
     if COMPONENT_GROUPS.get(comp1_name) is None:
@@ -139,7 +139,7 @@ with st.sidebar:
 
     st.subheader("Heaky Key (menos volátil)")
     comp2_name = st.selectbox(
-        "Componente 2", COMP_OPTIONS, index=2,
+        "Heavy Key", COMP_OPTIONS, index=2,
         format_func=lambda x: x if COMPONENT_GROUPS[x] is not None else x
     )
     if COMPONENT_GROUPS.get(comp2_name) is None:
@@ -175,8 +175,17 @@ if calcular or True:  # calcula sempre ao iniciar
                 f"⚠️ {c1_label} parece menos volátil que {c2_label} nessa pressão. "
                 "Considere trocar a ordem dos componentes para convenção x₁ = componente mais volátil."
             )
-
-        df = calc_vle(A1, B1, C1, A2, B2, C2, P_bar, n_points)
+            # 🔁 Reordenação automática (Light Key = mais volátil)
+        #if Tb1 > Tb2:
+            (A1, B1, C1, A2, B2, C2) = (A2, B2, C2, A1, B1, C1)
+            (c1_label, c2_label) = (c2_label, c1_label)
+        
+            st.info("Componentes reordenados automaticamente para manter Light Key como mais volátil.")
+        
+            # recalcula Tb após troca (importante!)
+            Tb1 = bubble_T(1.0, A1, B1, C1, A2, B2, C2, P_bar)
+            Tb2 = bubble_T(0.0, A1, B1, C1, A2, B2, C2, P_bar)
+                df = calc_vle(A1, B1, C1, A2, B2, C2, P_bar, n_points)
 
         # ── Métricas ──────────────────────────
         alpha_mean = df["α₁₂"].mean()
