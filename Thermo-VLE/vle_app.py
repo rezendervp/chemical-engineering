@@ -174,7 +174,7 @@ if calcular or True:  # calcula sempre ao iniciar
             st.warning(
                 f"⚠️ {c1_label} parece menos volátil que {c2_label} nessa pressão. "
                 "Considere trocar a ordem dos componentes para convenção x₁ = componente mais volátil."
-            )
+            #)
             # 🔁 Reordenação automática (Light Key = mais volátil)
         #if Tb1 > Tb2:
             (A1, B1, C1, A2, B2, C2) = (A2, B2, C2, A1, B1, C1)
@@ -186,7 +186,7 @@ if calcular or True:  # calcula sempre ao iniciar
             Tb1 = bubble_T(1.0, A1, B1, C1, A2, B2, C2, P_bar)
             Tb2 = bubble_T(0.0, A1, B1, C1, A2, B2, C2, P_bar)
                 df = calc_vle(A1, B1, C1, A2, B2, C2, P_bar, n_points)
-
+            )
         # ── Métricas ──────────────────────────
         alpha_mean = df["α₁₂"].mean()
         alpha_min  = df["α₁₂"].min()
