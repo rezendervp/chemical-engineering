@@ -285,7 +285,7 @@ if calcular or True:  # calcula sempre ao iniciar
         col_a, col_b = st.columns(2)
 
         # CSV completo
-        csv_full = df.to_csv(index=False, sep=";", decimal=",")
+        csv_full = df.to_csv(index=False,header=False, sep=";", decimal=",")
         col_a.download_button(
             "⬇️ CSV completo (separador ;)",
             data=csv_full.encode("utf-8"),
@@ -296,7 +296,7 @@ if calcular or True:  # calcula sempre ao iniciar
 
         # CSV x,y apenas (para app McCabe-Thiele)
         df_xy = df[["x₁", "y₁"]].rename(columns={"x₁": "x", "y₁": "y"})
-        csv_xy = df_xy.to_csv(index=False, sep=",", decimal=".")
+        csv_xy = df_xy.to_csv(index=False,header=False, sep=",", decimal=".")
         col_b.download_button(
             "⬇️ x,y para McCabe-Thiele (CSV)",
             data=csv_xy.encode("utf-8"),
