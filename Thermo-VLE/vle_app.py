@@ -185,7 +185,7 @@ if calcular or True:  # calcula sempre ao iniciar
             # recalcula Tb após troca (importante!)
             Tb1 = bubble_T(1.0, A1, B1, C1, A2, B2, C2, P_bar)
             Tb2 = bubble_T(0.0, A1, B1, C1, A2, B2, C2, P_bar)
-                df = calc_vle(A1, B1, C1, A2, B2, C2, P_bar, n_points)
+            df = calc_vle(A1, B1, C1, A2, B2, C2, P_bar, n_points)
         
         # ── Métricas ──────────────────────────
         alpha_mean = df["α₁₂"].mean()
