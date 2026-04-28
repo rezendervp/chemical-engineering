@@ -65,7 +65,10 @@ def pvap(A, B, C, T_K):
 def bubble_T(x1, A1, B1, C1, A2, B2, C2, P_bar, T_init=None):
     """Temperatura de bolha para composição x1 via iteração."""
     if T_init is None:
-        T_init = 360.0
+        # Chute ótimo: inverter Antoine analiticamente para cada puro
+        Tb1 = B1 / (A1 - math.log10(P_bar)) - C1
+        Tb2 = B2 / (A2 - math.log10(P_bar)) - C2
+        T_init = x1 * Tb1 + (1 - x1) * Tb2   # interpolação linear
     T = T_init
     for _ in range(200):
         pb1 = pvap(A1, B1, C1, T)
