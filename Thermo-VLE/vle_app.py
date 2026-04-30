@@ -82,9 +82,9 @@ def get_nrtl_params(name1, name2):
 # ─────────────────────────────────────────────
 # Funções de cálculo — termodinâmica
 # ─────────────────────────────────────────────
-def pvap(A, B, C, T_C):
-    """Pressão de vapor em atm — Antoine (log10 P/atm, T/°C)"""
-    return 10.0 ** (A - B / (T_C + C))
+def pvap(A, B, C, T_K):
+    """Pressão de vapor em bar — Antoine NIST (log10 P/bar, T/K)"""
+    return 10.0 ** (A - B / (T_K + C))
 
 def nrtl_gamma(x1, T_K, A12, A21, alpha):
     """
@@ -118,10 +118,16 @@ def nrtl_gamma(x1, T_K, A12, A21, alpha):
 
 def bubble_T(x1, A1, B1, C1, A2, B2, C2, P_bar, T_init=None,
              modelo="Raoult", A12=0.0, A21=0.0, alpha_nrtl=0.30):
+    """
+    Temperatura de bolha para composição x1 via Newton-Raphson.
+    Suporta modelos: 'Raoult' (ideal) ou 'NRTL'.
+    """
     if T_init is None:
-        Tb1 = B1 / (A1 - math.log10(P_bar)) - C1  # °C
-        Tb2 = B2 / (A2 - math.log10(P_bar)) - C2  # °C
-        T   = x1 * Tb1 + (1.0 - x1) * Tb2         # °C
+        # Chute ótimo: inverter Antoine analiticamente para cada puro
+        # Antoine NIST: log10(P/bar), T/K — inverter dá T em K diretamente
+        Tb1 = B1 / (A1 - math.log10(P_bar)) - C1 + 273.15
+        Tb2 = B2 / (A2 - math.log10(P_bar)) - C2 + 273.15
+        T   = x1 * Tb1 + (1.0 - x1) * Tb2
     else:
         T = T_init
 
@@ -130,7 +136,7 @@ def bubble_T(x1, A1, B1, C1, A2, B2, C2, P_bar, T_init=None,
         pb2 = pvap(A2, B2, C2, T)
 
         if modelo == "NRTL":
-            g1, g2 = nrtl_gamma(x1, T + 273.15, A12, A21, alpha_nrtl)
+            g1, g2 = nrtl_gamma(x1, T, A12, A21, alpha_nrtl)
         else:
             g1, g2 = 1.0, 1.0
 
@@ -139,11 +145,12 @@ def bubble_T(x1, A1, B1, C1, A2, B2, C2, P_bar, T_init=None,
         if abs(err) < 1e-7:
             break
 
+        # Derivada numérica (diferença finita progressiva, dT = 0.01 K)
         dT   = 0.01
         pb1d = pvap(A1, B1, C1, T + dT)
         pb2d = pvap(A2, B2, C2, T + dT)
         if modelo == "NRTL":
-            g1d, g2d = nrtl_gamma(x1, T + dT + 273.15, A12, A21, alpha_nrtl)
+            g1d, g2d = nrtl_gamma(x1, T + dT, A12, A21, alpha_nrtl)
         else:
             g1d, g2d = 1.0, 1.0
 
@@ -152,7 +159,7 @@ def bubble_T(x1, A1, B1, C1, A2, B2, C2, P_bar, T_init=None,
             break
         T -= err / dPdT
 
-    return T  # retorna em °C
+    return T
 
 def calc_vle(A1, B1, C1, A2, B2, C2, P_bar, n_points,
              modelo="Raoult", A12=0.0, A21=0.0, alpha_nrtl=0.30):
@@ -174,7 +181,7 @@ def calc_vle(A1, B1, C1, A2, B2, C2, P_bar, n_points,
         P2s = pvap(A2, B2, C2, T)
 
         if modelo == "NRTL":
-            g1, g2 = nrtl_gamma(x1, T + 273.15, A12, A21, alpha_nrtl)
+            g1, g2 = nrtl_gamma(x1, T, A12, A21, alpha_nrtl)
         else:
             g1, g2 = 1.0, 1.0
 
@@ -186,7 +193,7 @@ def calc_vle(A1, B1, C1, A2, B2, C2, P_bar, n_points,
             "x₁":             round(float(x1),  6),
             "y₁":             round(float(y1),  6),
             "T (K)":          round(float(T),   4),
-            "T (°C)":         round(float(T + 273.15), 4),
+            "T (°C)":         round(float(T - 273.15), 4),
             "P₁ˢᵃᵗ (bar)":   round(float(P1s), 6),
             "P₂ˢᵃᵗ (bar)":   round(float(P2s), 6),
             "γ₁":             round(float(g1),  6),
@@ -304,7 +311,7 @@ with st.sidebar:
     st.subheader("Condições de operação")
     P_atm = st.number_input("Pressão de operação (atm)", value=1.0,
                             min_value=0.1, max_value=20.0, step=0.1)
-    P_bar = P_atm  #* 1.01325
+    P_bar = P_atm * 1.01325
     n_points = st.slider("Número de pontos", min_value=11, max_value=101, value=21, step=5)
 
     calcular = st.button("🔄 Calcular", type="primary", use_container_width=True)
