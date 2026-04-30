@@ -82,9 +82,9 @@ def get_nrtl_params(name1, name2):
 # ─────────────────────────────────────────────
 # Funções de cálculo — termodinâmica
 # ─────────────────────────────────────────────
-def pvap(A, B, C, T_K):
-    """Pressão de vapor em bar — Antoine NIST (log10 P/bar, T/K)"""
-    return 10.0 ** (A - B / (T_K + C))
+def pvap(A, B, C, T_C):
+    """Pressão de vapor em atm — Antoine (log10 P/atm, T/°C)"""
+    return 10.0 ** (A - B / (T_C + C))
 
 def nrtl_gamma(x1, T_K, A12, A21, alpha):
     """
