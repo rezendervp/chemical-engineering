@@ -69,8 +69,8 @@ NRTL_PARAMS = {
     ("Acetona", "Metanol"):        {"A12":  980.6, "A21":  481.2,  "alpha": 0.30},
     ("Etanol",  "Tolueno"):        {"A12": 4108.0, "A21": 1021.0,  "alpha": 0.47},
     ("Metanol", "Acetato de etila"):{"A12": 1556.0,"A21": 1733.0,  "alpha": 0.47},
-    ("Benzeno", "Etanol"):         {"A12": 5058, "A21": 954, "alpha": 0.3},
-    
+    #("Benzeno", "Etanol"):         {"A12": 5058, "A21": 954, "alpha": 0.3},
+    ("Benzeno", "Etanol"):        {"A12": 3040.0, "A21": 1396.0, "alpha": 0.47},  
 }
 
 def get_nrtl_params(name1, name2):
