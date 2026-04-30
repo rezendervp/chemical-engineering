@@ -192,7 +192,7 @@ def calc_vle(A1, B1, C1, A2, B2, C2, P_bar, n_points,
             "x₁":             round(float(x1),  6),
             "y₁":             round(float(y1),  6),
             "T (K)":          round(float(T),   4),
-            "T (°C)":         round(float(T - 273.15), 4),
+            "T (°C)":         round(float(T + 273.15), 4),
             "P₁ˢᵃᵗ (bar)":   round(float(P1s), 6),
             "P₂ˢᵃᵗ (bar)":   round(float(P2s), 6),
             "γ₁":             round(float(g1),  6),
@@ -310,7 +310,7 @@ with st.sidebar:
     st.subheader("Condições de operação")
     P_atm = st.number_input("Pressão de operação (atm)", value=1.0,
                             min_value=0.1, max_value=20.0, step=0.1)
-    P_bar = P_atm * 1.01325
+    P_bar = P_atm  #* 1.01325
     n_points = st.slider("Número de pontos", min_value=11, max_value=101, value=21, step=5)
 
     calcular = st.button("🔄 Calcular", type="primary", use_container_width=True)
