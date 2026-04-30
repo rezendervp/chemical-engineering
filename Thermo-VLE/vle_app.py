@@ -65,7 +65,7 @@ NRTL_PARAMS = {
     ("Etanol",  "Água"):           {"A12": 3458.3, "A21": -53.6,  "alpha": 0.30},
     ("Metanol", "Água"):           {"A12": 2726.4, "A21":  937.3,  "alpha": 0.30},
     ("Acetona", "Água"):           {"A12": 3768.3, "A21": 1116.0,  "alpha": 0.47},
-    ("Acetona", "Clorofórmio"):    {"A12": -1704.0,"A21": -2051.0, "alpha": 0.30},
+    ("Acetona", "Clorofórmio"):    {"A12":  -2051.00,"A21": -1704., "alpha": 0.30},
     #("Acetona", "Clorofórmio"):     {"A12": 5456, "A21": 2514, "alpha": 0.30},
     #("Acetona", "Clorofórmio"): {"A12": -7128, "A21": -8581, "alpha": 0.30},
    
