@@ -124,15 +124,15 @@ def bubble_T(x1, A1, B1, C1, A2, B2, C2, P_bar, T_init=None,
     """
     if T_init is None:
         # Chute ótimo: inverter Antoine analiticamente para cada puro
-        Tb1 = B1 / (A1 - math.log10(P_bar)) - C1
-        Tb2 = B2 / (A2 - math.log10(P_bar)) - C2
-        T   = x1 * Tb1 + (1.0 - x1) * Tb2
+        Tb1 = B1 / (A1 - math.log10(P_bar)) - C1  # °C
+        Tb2 = B2 / (A2 - math.log10(P_bar)) - C2  # °C
+        T   = x1 * Tb1 + (1.0 - x1) * Tb2 + 273.15  # converte para K
     else:
         T = T_init
 
     for _ in range(200):
-        pb1 = pvap(A1, B1, C1, T)
-        pb2 = pvap(A2, B2, C2, T)
+        pb1 = pvap(A1, B1, C1, T - 273.15)
+        pb2 = pvap(A2, B2, C2, T - 273.15)
 
         if modelo == "NRTL":
             g1, g2 = nrtl_gamma(x1, T, A12, A21, alpha_nrtl)
@@ -146,8 +146,8 @@ def bubble_T(x1, A1, B1, C1, A2, B2, C2, P_bar, T_init=None,
 
         # Derivada numérica (diferença finita progressiva, dT = 0.01 K)
         dT   = 0.01
-        pb1d = pvap(A1, B1, C1, T + dT)
-        pb2d = pvap(A2, B2, C2, T + dT)
+        pb1d = pvap(A1, B1, C1, T + dT - 273.15)
+        pb2d = pvap(A2, B2, C2, T + dT - 273.15)
         if modelo == "NRTL":
             g1d, g2d = nrtl_gamma(x1, T + dT, A12, A21, alpha_nrtl)
         else:
