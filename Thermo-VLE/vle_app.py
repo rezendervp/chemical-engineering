@@ -118,24 +118,19 @@ def nrtl_gamma(x1, T_K, A12, A21, alpha):
 
 def bubble_T(x1, A1, B1, C1, A2, B2, C2, P_bar, T_init=None,
              modelo="Raoult", A12=0.0, A21=0.0, alpha_nrtl=0.30):
-    """
-    Temperatura de bolha para composição x1 via Newton-Raphson.
-    Suporta modelos: 'Raoult' (ideal) ou 'NRTL'.
-    """
     if T_init is None:
-        # Chute ótimo: inverter Antoine analiticamente para cada puro
         Tb1 = B1 / (A1 - math.log10(P_bar)) - C1  # °C
         Tb2 = B2 / (A2 - math.log10(P_bar)) - C2  # °C
-        T   = x1 * Tb1 + (1.0 - x1) * Tb2 + 273.15  # converte para K
+        T   = x1 * Tb1 + (1.0 - x1) * Tb2         # °C
     else:
         T = T_init
 
     for _ in range(200):
-        pb1 = pvap(A1, B1, C1, T - 273.15)
-        pb2 = pvap(A2, B2, C2, T - 273.15)
+        pb1 = pvap(A1, B1, C1, T)
+        pb2 = pvap(A2, B2, C2, T)
 
         if modelo == "NRTL":
-            g1, g2 = nrtl_gamma(x1, T, A12, A21, alpha_nrtl)
+            g1, g2 = nrtl_gamma(x1, T + 273.15, A12, A21, alpha_nrtl)
         else:
             g1, g2 = 1.0, 1.0
 
@@ -144,12 +139,11 @@ def bubble_T(x1, A1, B1, C1, A2, B2, C2, P_bar, T_init=None,
         if abs(err) < 1e-7:
             break
 
-        # Derivada numérica (diferença finita progressiva, dT = 0.01 K)
         dT   = 0.01
-        pb1d = pvap(A1, B1, C1, T + dT - 273.15)
-        pb2d = pvap(A2, B2, C2, T + dT - 273.15)
+        pb1d = pvap(A1, B1, C1, T + dT)
+        pb2d = pvap(A2, B2, C2, T + dT)
         if modelo == "NRTL":
-            g1d, g2d = nrtl_gamma(x1, T + dT, A12, A21, alpha_nrtl)
+            g1d, g2d = nrtl_gamma(x1, T + dT + 273.15, A12, A21, alpha_nrtl)
         else:
             g1d, g2d = 1.0, 1.0
 
@@ -158,7 +152,7 @@ def bubble_T(x1, A1, B1, C1, A2, B2, C2, P_bar, T_init=None,
             break
         T -= err / dPdT
 
-    return T
+    return T  # retorna em °C
 
 def calc_vle(A1, B1, C1, A2, B2, C2, P_bar, n_points,
              modelo="Raoult", A12=0.0, A21=0.0, alpha_nrtl=0.30):
