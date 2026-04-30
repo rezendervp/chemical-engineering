@@ -124,10 +124,10 @@ def bubble_T(x1, A1, B1, C1, A2, B2, C2, P_bar, T_init=None,
     """
     if T_init is None:
         # Chute ótimo: inverter Antoine analiticamente para cada puro
-        # Antoine NIST: log10(P/bar), T/K — inverter dá T em K diretamente
-        Tb1 = B1 / (A1 - math.log10(P_bar)) - C1 + 273.15
-        Tb2 = B2 / (A2 - math.log10(P_bar)) - C2 + 273.15
-        T   = x1 * Tb1 + (1.0 - x1) * Tb2
+        # Antoine NIST: log10(P/bar), T/K 
+        Tb1 = B1 / (A1 - math.log10(P_bar)) - C1   # já em K
+        Tb2 = B2 / (A2 - math.log10(P_bar)) - C2   # já em K
+        T   = x1 * Tb1 + (1.0 - x1) * Tb2          # K
     else:
         T = T_init
 
@@ -311,7 +311,7 @@ with st.sidebar:
     st.subheader("Condições de operação")
     P_atm = st.number_input("Pressão de operação (atm)", value=1.0,
                             min_value=0.1, max_value=20.0, step=0.1)
-    P_bar = P_atm * 1.01325
+    P_bar = P_atm    #* 1.01325
     n_points = st.slider("Número de pontos", min_value=11, max_value=101, value=21, step=5)
 
     calcular = st.button("🔄 Calcular", type="primary", use_container_width=True)
