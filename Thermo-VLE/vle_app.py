@@ -340,6 +340,44 @@ Os parâmetros A₁₂, A₂₁ e α são ajustados a dados experimentais e depe
 componentes. Utilize preferencialmente valores do banco DECHEMA ou da literatura.
     """)
 
+with st.expander("🔬 DIAGNÓSTICO DE UNIDADES"):
+    st.markdown("### Testando a função pvap com diferentes interpretações")
+    
+    T_K = 353.15  # 80°C em K
+    T_C = 80.0    # 80°C
+    
+    # Coeficientes do Benzeno (seus originais)
+    A, B, C = 5.40768, 1322.882, -53.015
+    
+    # Teste 1: T em K, fórmula original
+    P1 = 10 ** (A - B / (T_K + C))
+    
+    # Teste 2: T em °C, fórmula original
+    P2 = 10 ** (A - B / (T_C + C))
+    
+    # Teste 3: T em K, mas convertendo C para positivo (C + 273)
+    P3 = 10 ** (A - B / (T_K + (C + 273.15)))
+    
+    st.write(f"**Com seus coeficientes originais (Benzeno):**")
+    st.write(f"T = 80°C ({T_K} K)")
+    st.write(f"→ Usando T em K: {P1:.2f} bar")
+    st.write(f"→ Usando T em °C: {P2:.2f} bar")
+    st.write(f"→ Usando C corrigido: {P3:.2f} bar")
+    st.write(f"")
+    st.write(f"**Valor esperado:** ~1.013 bar")
+    
+    if abs(P2 - 1.013) < 0.5:
+        st.success("✅ SEUS COEFICIENTES ESPERAM T EM °C!")
+        st.code("""
+        # Corrija sua função pvap para:
+        def pvap(A, B, C, T_K):
+            T_C = T_K - 273.15
+            return 10.0 ** (A - B / (T_C + C))
+        """)
+    elif abs(P1 - 1.013) < 0.5:
+        st.success("✅ SEUS COEFICIENTES ESPERAM T EM K!")
+    else:
+        st.error("❌ Seus coeficientes não se encaixam em nenhum padrão comum")
 
 
 
