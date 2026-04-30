@@ -319,7 +319,7 @@ with st.sidebar:
     st.subheader("Condições de operação")
     P_atm = st.number_input("Pressão de operação (atm)", value=1.0,
                             min_value=0.1, max_value=20.0, step=0.1)
-    P_bar = P_atm  # coeficientes Antoine em atm, T em K
+    P_bar = P_atm* 1.01325 # coeficientes Antoine em atm, T em K
     n_points = st.slider("Número de pontos", min_value=11, max_value=101, value=21, step=5)
 
     calcular = st.button("🔄 Calcular", type="primary", use_container_width=True)
