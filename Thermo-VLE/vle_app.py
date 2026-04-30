@@ -84,7 +84,7 @@ def get_nrtl_params(name1, name2):
 # ─────────────────────────────────────────────
 def pvap(A, B, C, T_K):
     """Pressão de vapor em bar — Antoine NIST (log10 P/bar, T/K)"""
-    return 10.0 ** (A - B / (T_K + C))
+    return (10.0 ** (A - B / (T_K + C)))/9.91
 
 def nrtl_gamma(x1, T_K, A12, A21, alpha):
     """
@@ -345,37 +345,6 @@ componentes. Utilize preferencialmente valores do banco DECHEMA ou da literatura
 # ── Cálculo ───────────────────────────────────
 if calcular or True:
     try:
-        # ── DEPURAÇÃO TEMPORÁRIA (remover depois) ──
-        with st.expander("🔧 Diagnóstico - Clique para verificar os coeficientes"):
-        st.markdown("### Teste do Benzeno (ou primeiro componente)")
-        
-        # Usar o primeiro componente selecionado
-        T_eb_K = (d1.get("Tb_C", 100) + 273.15) if "Tb_C" in d1 else 373.15
-        P_calc = pvap(A1, B1, C1, T_eb_K)
-        
-        st.metric(
-            f"{c1_label} a {d1.get('Tb_C', '100')}°C (Tb conhecido)",
-            f"{P_calc:.4f} bar",
-            delta=f"Esperado ~1.013 bar"
-        )
-        
-        if abs(P_calc - 1.013) < 0.1:
-            st.success("✅ Coeficientes parecem corretos para bar")
-        elif abs(P_calc - 760) < 10:
-            st.warning("⚠️ Coeficientes parecem estar em mmHg! Adicione /760 na função pvap")
-        elif abs(P_calc - 101.3) < 5:
-            st.warning("⚠️ Coeficientes parecem estar em kPa! Adicione /101.325 na função pvap")
-        else:
-            st.error(f"❌ Valor inesperado: {P_calc:.2f}. Pode ser erro na escala de temperatura (K vs °C)")
-        
-        st.code(f"""
-        # Se for mmHg, altere a função pvap para:
-        def pvap(A, B, C, T_K):
-            P_mmHg = 10.0 ** (A - B / (T_K + C))
-            return P_mmHg / 760.0  # ← adicione esta linha
-        """)
-
-
         # Verificar componente 1 mais volátil
         Tb1 = bubble_T(1.0, A1, B1, C1, A2, B2, C2, P_bar)
         Tb2 = bubble_T(0.0, A1, B1, C1, A2, B2, C2, P_bar)
