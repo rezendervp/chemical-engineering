@@ -174,7 +174,7 @@ def calc_vle(A1, B1, C1, A2, B2, C2, P_bar, n_points,
         P2s = pvap(A2, B2, C2, T)
 
         if modelo == "NRTL":
-            g1, g2 = nrtl_gamma(x1, T, A12, A21, alpha_nrtl)
+            g1, g2 = nrtl_gamma(x1, T + 273.15, A12, A21, alpha_nrtl)
         else:
             g1, g2 = 1.0, 1.0
 
@@ -186,7 +186,7 @@ def calc_vle(A1, B1, C1, A2, B2, C2, P_bar, n_points,
             "x₁":             round(float(x1),  6),
             "y₁":             round(float(y1),  6),
             "T (K)":          round(float(T),   4),
-            "T (°C)":         round(float(T - 273.15), 4),
+            "T (°C)":         round(float(T + 273.15), 4),
             "P₁ˢᵃᵗ (bar)":   round(float(P1s), 6),
             "P₂ˢᵃᵗ (bar)":   round(float(P2s), 6),
             "γ₁":             round(float(g1),  6),
