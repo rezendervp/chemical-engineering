@@ -637,116 +637,98 @@ if calc_btn:
                                        "📈 Gráficos", "📋 Tabelas Detalhadas"])
 
     # ── TAB 1: Resultados FUGK ─────────────────────────────────────────────
+    # ── TAB 1: Resultados FUGK ─────────────────────────────────────────────
     with tab1:
         c1, c2 = st.columns(2)
         with c1:
             st.markdown("#### ① Fenske — N_min")
-            st.markdown(f"""
-            <div class='result-box'>
-            <b>S_LK</b> = d_LK/b_LK = {S_LK:.4f}<br>
-            <b>b_HK/d_HK</b> = {bHK_dHK:.4f}<br>
-            <b>α_LK/α_HK</b> = {alpha_arr[lk]/alpha_arr[hk]:.4f}<br>
-            <b>N_min</b> = <span style='font-size:1.2rem'>{N_min:.4f}</span> estágios
-            </div>""", unsafe_allow_html=True)
-
+            # Substituir o markdown colorido por st.info ou st.success
+            st.info(f"""
+            **S_LK** = d_LK/b_LK = {S_LK:.4f}  
+            **b_HK/d_HK** = {bHK_dHK:.4f}  
+            **α_LK/α_HK** = {alpha_arr[lk]/alpha_arr[hk]:.4f}  
+            **N_min** = **{N_min:.4f}** estágios
+            """)
+    
             st.markdown("#### ② Underwood — R_min")
-            st.markdown(f"""
-            <div class='result-box'>
-            <b>θ</b> = {theta:.6f} &nbsp;(entre α_HK={alpha_arr[hk]:.4f} e α_LK={alpha_arr[lk]:.4f})<br>
-            <b>V_min</b> = {V_min:.3f} kmol/h<br>
-            <b>R_min</b> = <span style='font-size:1.2rem'>{R_min:.4f}</span>
-            </div>""", unsafe_allow_html=True)
-
+            st.info(f"""
+            **θ** = {theta:.6f} (entre α_HK={alpha_arr[hk]:.4f} e α_LK={alpha_arr[lk]:.4f})  
+            **V_min** = {V_min:.3f} kmol/h  
+            **R_min** = **{R_min:.4f}**
+            """)
+    
         with c2:
             st.markdown("#### ③ Gilliland — N real")
-            st.markdown(f"""
-            <div class='result-box'>
-            <b>R_op</b> = {R_factor} × R_min = {R_op:.4f}<br>
-            <b>X</b> = {X_gill:.4f} &nbsp; <b>Y</b> (Molokanov) = {Y_gill:.4f}<br>
-            <b>N_real</b> = {N_real:.2f} → <span style='font-size:1.2rem'><b>N_total = {N_total}</b></span> estágios
-            </div>""", unsafe_allow_html=True)
-
+            st.success(f"""
+            **R_op** = {R_factor} × R_min = {R_op:.4f}  
+            **X** = {X_gill:.4f} &nbsp; **Y** (Molokanov) = {Y_gill:.4f}  
+            **N_real** = {N_real:.2f} → **N_total = {N_total}** estágios
+            """)
+    
             st.markdown("#### ④ Kirkbride — Prato de alimentação")
-            st.markdown(f"""
-            <div class='result-box'>
-            <b>Nr/Ns</b> = {Nr_Ns:.4f}<br>
-            <b>Nr</b> (retificação) = {Nr} &nbsp;|&nbsp; <b>Ns</b> (esgotamento) = {Ns}<br>
-            <b>N_F</b> = <span style='font-size:1.2rem'><b>{N_feed}</b></span> (do topo)
-            </div>""", unsafe_allow_html=True)
-
-        # Resumo fluxos
-        st.markdown("---")
-        st.markdown("#### Fluxos e Composições")
-        df_res = pd.DataFrame({
-            "Componente": selected,
-            "α_i": [f"{a:.4f}" for a in alpha_arr],
-            "z_i (feed)":  [f"{v:.4f}" for v in z_arr],
-            "d_i [kmol/h]":[f"{v:.4f}" for v in d_all],
-            "b_i [kmol/h]":[f"{v:.4f}" for v in b_all],
-            "x_D,i":       [f"{v:.4f}" for v in x_D],
-            "x_B,i":       [f"{v:.4f}" for v in x_B],
-        })
-        st.dataframe(df_res, use_container_width=True)
-        st.markdown(f"**D** = {D:.3f} kmol/h &nbsp;|&nbsp; **B** = {B:.3f} kmol/h")
-
-    # ── TAB 2: Flash & Termodinâmica ───────────────────────────────────────
-    with tab2:
-        st.markdown(f"#### Flash Isotérmico — T = {T_feed:.2f} °C · P = {P_atm:.2f} atm · Modelo: {thermo_key}")
-
-        col_a, col_b = st.columns(2)
-        with col_a:
-            psi_label = f"ψ (fração vaporizada) = {psi_F:.4f}"
-            if psi_F < 0.01:
-                estado = "🟦 Líquido (ou próximo ao ponto de bolha)"
-            elif psi_F > 0.99:
-                estado = "🟧 Vapor (ou próximo ao ponto de orvalho)"
-            else:
-                estado = f"🟩 Mistura líquido-vapor (ψ = {psi_F:.3f})"
-            st.info(f"{psi_label}\n\n{estado}")
-
-        with col_b:
-            if thermo_key == "NRTL":
-                pairs_found = []
-                for ci, cj in [(selected[i], selected[j])
-                               for i in range(len(selected))
-                               for j in range(i+1, len(selected))]:
-                    if get_nrtl(ci, cj) is not None:
-                        pairs_found.append(f"{ci} / {cj}")
-                if pairs_found:
-                    st.success("Parâmetros NRTL encontrados:\n" + "\n".join(f"• {p}" for p in pairs_found))
+            st.success(f"""
+            **Nr/Ns** = {Nr_Ns:.4f}  
+            **Nr** (retificação) = {Nr} &nbsp;|&nbsp; **Ns** (esgotamento) = {Ns}  
+            **N_F** = **{N_feed}** (do topo)
+            """)
+        # ── TAB 2: Flash & Termodinâmica ───────────────────────────────────────
+        with tab2:
+            st.markdown(f"#### Flash Isotérmico — T = {T_feed:.2f} °C · P = {P_atm:.2f} atm · Modelo: {thermo_key}")
+    
+            col_a, col_b = st.columns(2)
+            with col_a:
+                psi_label = f"ψ (fração vaporizada) = {psi_F:.4f}"
+                if psi_F < 0.01:
+                    estado = "🟦 Líquido (ou próximo ao ponto de bolha)"
+                elif psi_F > 0.99:
+                    estado = "🟧 Vapor (ou próximo ao ponto de orvalho)"
                 else:
-                    st.warning("Nenhum par com parâmetros NRTL. Usando Raoult para todos.")
-
-        df_flash = pd.DataFrame({
-            "Componente": selected,
-            "K_i": [f"{v:.4f}" for v in K_feed],
-            "α_i (rel. HK)": [f"{v:.4f}" for v in alpha_arr],
-            "Psat [mmHg]": [f"{psat_mmhg(c, T_feed):.2f}" for c in selected],
-            "x_i (líquido)": [f"{v:.4f}" for v in x_F],
-            "y_i (vapor)": [f"{v:.4f}" for v in y_F],
-        })
-        st.dataframe(df_flash, use_container_width=True)
-
-        if thermo_key == "NRTL":
-            gamma = gamma_multicomp_nrtl(x_F, selected)
-            df_gamma = pd.DataFrame({
+                    estado = f"🟩 Mistura líquido-vapor (ψ = {psi_F:.3f})"
+                st.info(f"{psi_label}\n\n{estado}")
+    
+            with col_b:
+                if thermo_key == "NRTL":
+                    pairs_found = []
+                    for ci, cj in [(selected[i], selected[j])
+                                   for i in range(len(selected))
+                                   for j in range(i+1, len(selected))]:
+                        if get_nrtl(ci, cj) is not None:
+                            pairs_found.append(f"{ci} / {cj}")
+                    if pairs_found:
+                        st.success("Parâmetros NRTL encontrados:\n" + "\n".join(f"• {p}" for p in pairs_found))
+                    else:
+                        st.warning("Nenhum par com parâmetros NRTL. Usando Raoult para todos.")
+    
+            df_flash = pd.DataFrame({
                 "Componente": selected,
-                "γ_i (NRTL)": [f"{v:.4f}" for v in gamma],
+                "K_i": [f"{v:.4f}" for v in K_feed],
+                "α_i (rel. HK)": [f"{v:.4f}" for v in alpha_arr],
+                "Psat [mmHg]": [f"{psat_mmhg(c, T_feed):.2f}" for c in selected],
+                "x_i (líquido)": [f"{v:.4f}" for v in x_F],
+                "y_i (vapor)": [f"{v:.4f}" for v in y_F],
             })
-            st.markdown("##### Coeficientes de Atividade NRTL (fase líquida)")
-            st.dataframe(df_gamma, use_container_width=True)
-
-        # Temperaturas de bolha e orvalho
-        st.markdown("---")
-        try:
-            T_bub = find_bubble_point(selected, z_arr, P_atm, thermo_key)
-            T_dew = find_dew_point(selected, z_arr, P_atm, thermo_key)
-            cc1, cc2, cc3 = st.columns(3)
-            cc1.metric("T bolha (alimentação)", f"{T_bub:.2f} °C")
-            cc2.metric("T orvalho (alimentação)", f"{T_dew:.2f} °C")
-            cc3.metric("T flash utilizada", f"{T_feed:.2f} °C")
-        except Exception as e:
-            st.warning(f"Não foi possível calcular T bolha/orvalho: {e}")
+            st.dataframe(df_flash, use_container_width=True)
+    
+            if thermo_key == "NRTL":
+                gamma = gamma_multicomp_nrtl(x_F, selected)
+                df_gamma = pd.DataFrame({
+                    "Componente": selected,
+                    "γ_i (NRTL)": [f"{v:.4f}" for v in gamma],
+                })
+                st.markdown("##### Coeficientes de Atividade NRTL (fase líquida)")
+                st.dataframe(df_gamma, use_container_width=True)
+    
+            # Temperaturas de bolha e orvalho
+            st.markdown("---")
+            try:
+                T_bub = find_bubble_point(selected, z_arr, P_atm, thermo_key)
+                T_dew = find_dew_point(selected, z_arr, P_atm, thermo_key)
+                cc1, cc2, cc3 = st.columns(3)
+                cc1.metric("T bolha (alimentação)", f"{T_bub:.2f} °C")
+                cc2.metric("T orvalho (alimentação)", f"{T_dew:.2f} °C")
+                cc3.metric("T flash utilizada", f"{T_feed:.2f} °C")
+            except Exception as e:
+                st.warning(f"Não foi possível calcular T bolha/orvalho: {e}")
 
     # ── TAB 3: Gráficos ────────────────────────────────────────────────────
     with tab3:
