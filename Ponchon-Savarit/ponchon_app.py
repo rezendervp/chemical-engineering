@@ -26,7 +26,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# CSS customizado (completo)
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap');
@@ -34,12 +33,10 @@ st.markdown("""
 html, body, [class*="css"] {
     font-family: 'IBM Plex Sans', sans-serif;
 }
-
 .stApp {
     background: #0d1b2a;
     color: #e8f4f8;
 }
-
 [data-testid="stSidebar"] {
     background: #112233;
     border-right: 1px solid #1e3a5f;
@@ -47,7 +44,6 @@ html, body, [class*="css"] {
 [data-testid="stSidebar"] * {
     color: #cce0f0 !important;
 }
-
 .main-title {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 2.1rem;
@@ -63,7 +59,6 @@ html, body, [class*="css"] {
     margin-top: 4px;
     font-family: 'IBM Plex Mono', monospace;
 }
-
 .result-card {
     background: #1a2f45;
     border: 1px solid #1e3a5f;
@@ -79,7 +74,6 @@ html, body, [class*="css"] {
 .result-card.feed    { border-left-color: #26a69a; }
 .result-card.stages  { border-left-color: #ef5350; }
 .result-card.warning { border-left-color: #ffa726; background: #2a1f10; }
-
 .section-header {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.75rem;
@@ -91,7 +85,6 @@ html, body, [class*="css"] {
     border-bottom: 1px solid #1e3a5f;
     padding-bottom: 4px;
 }
-
 .stButton > button {
     background: #1565c0;
     color: white;
@@ -100,20 +93,14 @@ html, body, [class*="css"] {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.85rem;
     font-weight: 600;
-    letter-spacing: 0.5px;
     padding: 8px 20px;
-    transition: background 0.2s;
 }
-.stButton > button:hover {
-    background: #1976d2;
-}
-
+.stButton > button:hover { background: #1976d2; }
 .stSlider label, .stSelectbox label {
     font-size: 0.8rem !important;
     color: #90caf9 !important;
     font-family: 'IBM Plex Mono', monospace !important;
 }
-
 .stTabs [data-baseweb="tab"] {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.8rem;
@@ -123,16 +110,10 @@ html, body, [class*="css"] {
     color: #4fc3f7 !important;
     border-bottom-color: #4fc3f7 !important;
 }
-
 .streamlit-expanderHeader {
     font-family: 'IBM Plex Mono', monospace !important;
     font-size: 0.82rem !important;
     color: #90caf9 !important;
-}
-
-.stAlert {
-    border-radius: 6px;
-    font-size: 0.85rem;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -140,7 +121,6 @@ html, body, [class*="css"] {
 # ═══════════════════════════════════════════════════════════════════════
 #  BANCO DE DADOS TERMODINÂMICOS
 # ═══════════════════════════════════════════════════════════════════════
-
 COMPOUNDS = {
     "Benzeno": {
         "A": 6.90565, "B": 1211.033, "C": 220.790,
@@ -203,7 +183,6 @@ COMPOUNDS = {
 # ═══════════════════════════════════════════════════════════════════════
 #  FUNÇÕES TERMODINÂMICAS
 # ═══════════════════════════════════════════════════════════════════════
-
 def Psat(comp, T_C):
     d = COMPOUNDS[comp]
     return 10.0 ** (d["A"] - d["B"] / (d["C"] + T_C))
@@ -283,9 +262,8 @@ def H_mix_V(comp_A, comp_B, y, T_C):
     return y * HV_pure(comp_A, T_C) + (1 - y) * HV_pure(comp_B, T_C)
 
 # ═══════════════════════════════════════════════════════════════════════
-#  CURVAS DE EQUILÍBRIO
+#  CURVAS DE EQUILÍBRIO E ISOTERMAS
 # ═══════════════════════════════════════════════════════════════════════
-
 @st.cache_data(show_spinner=False)
 def build_equilibrium_curves(comp_A, comp_B, P_bar, n_pts=80):
     x_arr = np.linspace(0.0, 1.0, n_pts)
@@ -322,7 +300,6 @@ def build_equilibrium_curves(comp_A, comp_B, P_bar, n_pts=80):
         T_bub_arr[i] = Tb
         Td = dew_T(comp_A, comp_B, y, P_bar)
         T_dew_arr[i] = Td if Td is not None else Tb
-
     return x_arr, y_arr, HL_arr, HV_arr, T_bub_arr, T_dew_arr
 
 @st.cache_data(show_spinner=False)
@@ -372,9 +349,8 @@ def build_isotherms(comp_A, comp_B, P_bar, T_list):
     return isotherms
 
 # ═══════════════════════════════════════════════════════════════════════
-#  ALGORITMO PONCHON-SAVARIT
+#  ALGORITMO PONCHON-SAVARIT (COM CÁLCULO DE RMIN CORRIGIDO)
 # ═══════════════════════════════════════════════════════════════════════
-
 def interp_HL(x_val, x_arr, HL_arr):
     return float(np.interp(x_val, x_arr, HL_arr))
 
@@ -400,7 +376,7 @@ def find_y_on_HV_line(xL, HLx, xD, HD_p, x_arr, y_arr, HV_arr, side="rectificati
             if vals[k]*vals[k+1] < 0:
                 y1 = brentq(residual, lo+k*(hi-lo)/39, lo+(k+1)*(hi-lo)/39, xtol=1e-6)
                 return y1, interp_HV_from_y(y1, y_arr, HV_arr, x_arr)
-    except Exception:
+    except:
         pass
     return None, None
 
@@ -421,7 +397,7 @@ def find_x_tieline(y1, x_arr, y_arr, HL_arr):
         pass
     return None, None
 
-def ponchon_savarit(x_arr, y_arr, HL_arr, HV_arr, xD, xW, zF, HD_p, HW_p, q, max_stages=30):
+def ponchon_savarit(x_arr, y_arr, HL_arr, HV_arr, xD, xW, zF, HD_p, HW_p, q, max_stages=50):
     HL_xD = interp_HL(xD, x_arr, HL_arr)
     stages = []
     in_rect = True
@@ -456,40 +432,63 @@ def ponchon_savarit(x_arr, y_arr, HL_arr, HV_arr, xD, xW, zF, HD_p, HW_p, q, max
     return stages, HF
 
 def compute_poles(comp_A, comp_B, P_bar, xD, xW, zF, R, q, x_arr, y_arr, HL_arr, HV_arr):
+    # Entalpias no topo
     HL_xD = interp_HL(xD, x_arr, HL_arr)
     idx_xD = np.argmin(np.abs(x_arr - xD))
     y_top = y_arr[idx_xD]
     HV_top = interp_HV_from_y(y_top, y_arr, HV_arr, x_arr)
+    # Polo de retificação
     HD_p = (R + 1) * HV_top - R * HL_xD
+
+    # Alimentação
     HL_zF = interp_HL(zF, x_arr, HL_arr)
     HV_zF = interp_HV_from_y(zF, y_arr, HV_arr, x_arr)
     HF = (1 - q) * HV_zF + q * HL_zF
+
+    # Polo de esgotamento (colinearidade)
     if abs(xD - zF) < 1e-9:
         HW_p = HF
     else:
         slope = (HD_p - HF) / (xD - zF)
         HW_p = HF + slope * (xW - zF)
-    Rm = None
-    HD_p_min = None
-    for i in range(len(x_arr)-1):
-        xL_i = x_arr[i]
-        y_i = y_arr[i]
-        HL_i = HL_arr[i]
-        HV_i = HV_arr[i]
-        if abs(y_i - xL_i) < 1e-6:
+
+    # ----- CÁLCULO DO REFLUXO MÍNIMO (CORRIGIDO) -----
+    # Para cada tie-line, estenda até x = xD e calcule o H correspondente.
+    # O menor H (mais baixo) dá o menor R.
+    # OBS: Só consideramos tie-lines onde xL < xD (líquido mais pobre no leve)
+    H_at_xD_list = []
+    for i in range(len(x_arr)):
+        xL = x_arr[i]
+        y = y_arr[i]
+        HL = HL_arr[i]
+        HV = HV_arr[i]
+        if abs(y - xL) < 1e-8:
             continue
-        slope_tl = (HV_i - HL_i) / (y_i - xL_i)
-        H_at_xD = HL_i + slope_tl * (xD - xL_i)
-        if H_at_xD > (HD_p_min or -1e10) and xL_i < xD:
-            HD_p_min = H_at_xD
-            Rm_cand = (HD_p_min - HV_top) / (HV_top - HL_xD)
-            Rm = max(Rm_cand, 0.0)
+        if xL >= xD:      # tie-lines à direita de xD não são relevantes
+            continue
+        # Inclinação da tie-line
+        slope_tl = (HV - HL) / (y - xL)
+        H_at_xD = HL + slope_tl * (xD - xL)
+        # Evita valores absurdos (deve estar entre HL e HV, mas extrapolando pode dar algo)
+        if H_at_xD > HL and H_at_xD < 1e6:   # apenas valores razoáveis
+            H_at_xD_list.append(H_at_xD)
+
+    if H_at_xD_list:
+        H_min = min(H_at_xD_list)   # menor H em xD entre todas as tie-lines
+        # Rmin = (H_min - HV_top) / (HV_top - HL_xD)
+        denom = HV_top - HL_xD
+        if denom > 0:
+            Rm = (H_min - HV_top) / denom
+        else:
+            Rm = None
+    else:
+        Rm = None
+
     return HD_p, HW_p, HF, Rm, HL_xD, HV_top, y_top
 
 # ═══════════════════════════════════════════════════════════════════════
 #  FUNÇÕES DE PLOT
 # ═══════════════════════════════════════════════════════════════════════
-
 def make_hxy_plot(comp_A, comp_B, P_bar, x_arr, y_arr, HL_arr, HV_arr, T_bub_arr,
                   xD, xW, zF, R, q, HD_p, HW_p, HF, HL_xD, HV_top, stages,
                   show_isotherms, isotherms, n_iso, show_equil_pts, show_poles_line,
@@ -498,6 +497,7 @@ def make_hxy_plot(comp_A, comp_B, P_bar, x_arr, y_arr, HL_arr, HV_arr, T_bub_arr
     fig.patch.set_facecolor("#0d1b2a")
     ax.set_facecolor("#0d1b2a")
     ax.fill_between(x_arr, HL_arr, HV_arr, color="#1e3a5f", alpha=0.55, zorder=1, label="Região bifásica")
+
     if show_isotherms and isotherms:
         sel = isotherms[:n_iso]
         cmap = plt.cm.plasma
@@ -508,11 +508,13 @@ def make_hxy_plot(comp_A, comp_B, P_bar, x_arr, y_arr, HL_arr, HV_arr, T_bub_arr
             ax.plot(iso["x_bub"], iso["HL_bub"], 'o', color=col, ms=5, zorder=3, alpha=0.85)
             ax.plot(iso["y_dew"], iso["HV_dew"], 'o', color=col, ms=5, zorder=3, alpha=0.85)
             ax.text(iso["x_bub"]-0.035, iso["HL_bub"], f"{iso['T']:.0f}°C", fontsize=6.5, color=col, ha="right", va="center", fontfamily="monospace")
+
     ax.plot(x_arr, HV_arr, color="#4fc3f7", lw=2.5, zorder=4, label="$H_V(y)$ — vapor sat.")
     ax.plot(x_arr, HL_arr, color="#ef5350", lw=2.5, zorder=4, label="$H_L(x)$ — líquido sat.")
     mid = len(x_arr)//2
     ax.text(x_arr[mid]+0.04, HV_arr[mid]+0.3, "$H_V(y)$", color="#4fc3f7", fontsize=11, fontweight="bold", fontfamily="monospace")
     ax.text(x_arr[mid]+0.04, HL_arr[mid]-0.6, "$H_L(x)$", color="#ef5350", fontsize=11, fontweight="bold", fontfamily="monospace")
+
     if show_equil_pts:
         HL_xW = interp_HL(xW, x_arr, HL_arr)
         for val, col in [(xD, "#4fc3f7"), (xW, "#ef5350")]:
@@ -522,6 +524,7 @@ def make_hxy_plot(comp_A, comp_B, P_bar, x_arr, y_arr, HL_arr, HV_arr, T_bub_arr
         if show_annotations:
             ax.annotate(f"$x_D={xD:.2f}$", xy=(xD, HL_xD), xytext=(xD-0.18, HL_xD+0.9), fontsize=9, color="#4fc3f7", fontweight="bold", arrowprops=dict(arrowstyle="->", color="#4fc3f7", lw=1.2))
             ax.annotate(f"$x_W={xW:.2f}$", xy=(xW, HL_xW), xytext=(xW+0.08, HL_xW+0.9), fontsize=9, color="#ef5350", fontweight="bold", arrowprops=dict(arrowstyle="->", color="#ef5350", lw=1.2))
+
     ax.plot(xD, HD_p, '*', color="#ab47bc", ms=20, markeredgecolor="white", markeredgewidth=0.6)
     if show_annotations:
         ax.annotate(f"$\\Delta_R$\n({xD:.2f}, {HD_p:.2f})", xy=(xD, HD_p), xytext=(xD-0.30, HD_p-1.2), fontsize=8.5, color="#ab47bc", fontweight="bold", arrowprops=dict(arrowstyle="->", color="#ab47bc", lw=1.3), bbox=dict(fc="#1a0a2e", ec="#ab47bc", alpha=0.85))
@@ -531,12 +534,14 @@ def make_hxy_plot(comp_A, comp_B, P_bar, x_arr, y_arr, HL_arr, HV_arr, T_bub_arr
     ax.plot(zF, HF, 'D', color="#26a69a", ms=11, markeredgecolor="white", markeredgewidth=0.8)
     if show_annotations:
         ax.annotate(f"$F$ ({zF:.2f}, {HF:.2f})\n$q={q:.2f}$", xy=(zF, HF), xytext=(zF+0.08, HF+0.9), fontsize=8.5, color="#26a69a", fontweight="bold", arrowprops=dict(arrowstyle="->", color="#26a69a", lw=1.2), bbox=dict(fc="#0a2020", ec="#26a69a", alpha=0.85))
+
     if show_poles_line:
         xs_line = np.array([xW-0.02, xD+0.01])
         if abs(xD - zF) > 1e-6:
             slope = (HD_p - HF) / (xD - zF)
             ys_line = HF + slope * (xs_line - zF)
             ax.plot(xs_line, ys_line, color="#b0b030", lw=1.3, ls='-.', alpha=0.65, label="Reta $\\Delta_R$–$F$–$\\Delta_S$")
+
     if show_stages and stages:
         for stg in stages:
             col_op = "#7e57c2" if stg["section"]=="R" else "#ffa726"
@@ -547,6 +552,7 @@ def make_hxy_plot(comp_A, comp_B, P_bar, x_arr, y_arr, HL_arr, HV_arr, T_bub_arr
             ax.plot(stg["x1"], stg["HL1"], 'o', color=col_tie, ms=7, markeredgecolor="white", markeredgewidth=0.5)
             if show_annotations:
                 ax.text(stg["x1"]-0.01, stg["HL1"]-0.55, str(stg["n"]), fontsize=8.5, color=col_tie, fontweight="bold", ha="center", fontfamily="monospace")
+
     ax.set_xlim(-0.03, 1.05)
     all_H = np.concatenate([HL_arr[~np.isnan(HL_arr)], HV_arr[~np.isnan(HV_arr)]])
     H_lo = min(all_H.min()-1.0, HW_p-1.0)
@@ -561,7 +567,7 @@ def make_hxy_plot(comp_A, comp_B, P_bar, x_arr, y_arr, HL_arr, HV_arr, T_bub_arr
         spine.set_edgecolor("#1e3a5f")
     ax.grid(True, color="#1e3a5f", lw=0.7, alpha=0.8, zorder=0)
     ax.minorticks_on()
-    legend = ax.legend(loc="upper left", fontsize=8.5, framealpha=0.85, edgecolor="#1e3a5f", facecolor="#0d1b2a", labelcolor="#cce0f0")
+    ax.legend(loc="upper left", fontsize=8.5, framealpha=0.85, edgecolor="#1e3a5f", facecolor="#0d1b2a", labelcolor="#cce0f0")
     fig.tight_layout(pad=0.8)
     return fig
 
@@ -587,7 +593,6 @@ def make_yx_plot(x_arr, y_arr, comp_A, comp_B, P_bar, xD, xW, zF):
 # ═══════════════════════════════════════════════════════════════════════
 #  INTERFACE STREAMLIT
 # ═══════════════════════════════════════════════════════════════════════
-
 st.markdown("""
 <div class="main-title">⚗ Ponchon–Savarit</div>
 <div class="main-sub">Destilação Binária · Flash Calculations · Diagrama H-x-y Interativo</div>
@@ -627,6 +632,7 @@ with st.sidebar:
     st.markdown('<div class="section-header">Resolução</div>', unsafe_allow_html=True)
     n_pts = st.slider("Pontos nas curvas", 40, 200, 100, 10)
 
+# Validações
 errors = []
 if xW >= zF:
     errors.append("⚠ xW deve ser menor que zF")
@@ -650,31 +656,35 @@ if len(x_arr) == 0:
     st.error("❌ Não foi possível calcular curvas de equilíbrio. Tente ajustar a pressão ou escolher outro par.")
     st.stop()
 
-if show_isotherms:
-    if len(T_bub_arr) > 1:
-        T_min = T_bub_arr.min()
-        T_max = T_bub_arr.max()
-        T_pure_A = T_pure(comp_A, P_bar)
-        T_pure_B = T_pure(comp_B, P_bar)
-        T_min = min(T_min, T_pure_A, T_pure_B)
-        T_max = max(T_max, T_pure_A, T_pure_B)
-        T_list = np.linspace(T_min, T_max, max(10, n_iso*2))
-        with st.spinner("Calculando isotermas…"):
-            isotherms_data = build_isotherms(comp_A, comp_B, P_bar, T_list)
-    else:
-        isotherms_data = []
+# Isotermas
+if show_isotherms and len(T_bub_arr) > 1:
+    T_min = T_bub_arr.min()
+    T_max = T_bub_arr.max()
+    T_pure_A = T_pure(comp_A, P_bar)
+    T_pure_B = T_pure(comp_B, P_bar)
+    T_min = min(T_min, T_pure_A, T_pure_B)
+    T_max = max(T_max, T_pure_A, T_pure_B)
+    T_list = np.linspace(T_min, T_max, max(10, n_iso*2))
+    with st.spinner("Calculando isotermas…"):
+        isotherms_data = build_isotherms(comp_A, comp_B, P_bar, T_list)
 else:
     isotherms_data = []
 
-HD_p, HW_p, HF, Rm, HL_xD, HV_top, y_top = compute_poles(comp_A, comp_B, P_bar, xD, xW, zF, R, q, x_arr, y_arr, HL_arr, HV_arr)
+# Cálculo dos polos e refluxo mínimo
+HD_p, HW_p, HF, Rm, HL_xD, HV_top, y_top = compute_poles(
+    comp_A, comp_B, P_bar, xD, xW, zF, R, q, x_arr, y_arr, HL_arr, HV_arr
+)
 
 if Rm is not None and R < Rm:
     st.markdown(f'<div class="result-card warning">⛔ R = {R:.2f} < R_min ≈ {Rm:.3f} — Separação impossível com este refluxo!</div>', unsafe_allow_html=True)
 
+# Estágios
 stages = []
 if show_stages:
     with st.spinner("Calculando estágios…"):
-        stages, HF_calc = ponchon_savarit(x_arr, y_arr, HL_arr, HV_arr, xD, xW, zF, HD_p, HW_p, q)
+        stages, HF_calc = ponchon_savarit(x_arr, y_arr, HL_arr, HV_arr, xD, xW, zF, HD_p, HW_p, q, max_stages=50)
+        if not stages:
+            st.warning("⚠️ Nenhum estágio foi calculado. Tente aumentar o refluxo (R) ou ajustar as composições.")
 
 col_plot, col_info = st.columns([2.6, 1.0])
 
@@ -731,15 +741,11 @@ with st.expander("ℹ️ Sobre o método e modelos utilizados", expanded=False):
 - Pressões de vapor via equação de **Antoine** (log₁₀ P = A - B/(C+T))
 - Temperatura de bolha e orvalho por método iterativo (Brentq)
 
-**Entalpias:**
-- Referência: líquido puro a {T_REF}°C → H = 0
-- Líquido: H_L = Cp_L · (T - T_ref)
-- Vapor: H_V = Cp_L · (T_eb - T_ref) + λ(T_eb) + Cp_V · (T - T_eb)
-- Misturas: regra de mistura ideal (sem calor de mistura)
+**Entalpias:** referência líquido puro a {T_REF}°C → H = 0
 
 **Polo de retificação:** H'_D = (R+1)·H_V(y_topo) - R·H_L(x_D)
 **Polo de esgotamento:** colinearidade ΔR – F – ΔS
 
-**Algoritmo de estágios:** reta polo → HV (interseção numérica) → tie-line (inversão da curva y(x))
+**Algoritmo de estágios:** reta polo → HV → tie-line → próximo líquido
 """)
     st.markdown(f"**Compostos disponíveis:** {', '.join(COMPOUNDS.keys())}")
