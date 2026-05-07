@@ -12,7 +12,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.patches import FancyArrowPatch
-#from scipy.optimize import brentq, fsolve
+from scipy.optimize import brentq
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -259,34 +259,50 @@ def Hvap(comp, T_C):
     d = COMPOUNDS[comp]
     return max(d["Hvap_ref"] + d["dHvap_dT"] * (T_C - 25.0), 1.0)
 
+# Função auxiliar para temperatura de ebulição do puro a dada pressão
+def T_pure(comp, P_bar):
+    """Temperatura de ebulição do composto puro a P_bar (°C)."""
+    P_mmHg = P_bar * 750.062
+    d = COMPOUNDS[comp]
+    def obj(T):
+        return Psat(comp, T) - P_mmHg
+    T_lo = d["Tb"] - 50
+    T_hi = d["Tb"] + 50
+    try:
+        return brentq(obj, T_lo, T_hi, xtol=1e-5)
+    except:
+        return d["Tb"]
+
 def bubble_T(comp_A, comp_B, x, P_bar):
     """Temperatura de bolha (°C) para líquido de composição x a pressão P."""
     P_mmHg = P_bar * 750.062
+    # Temperaturas de ebulição dos puros na pressão atual
+    T_A = T_pure(comp_A, P_bar)
+    T_B = T_pure(comp_B, P_bar)
+    T_lo = min(T_A, T_B) - 10
+    T_hi = max(T_A, T_B) + 10
     def obj(T):
         yA = x * Psat(comp_A, T) / P_mmHg
         yB = (1 - x) * Psat(comp_B, T) / P_mmHg
         return yA + yB - 1.0
-    # Limites: pontos de ebulição dos puros ± margem
-    dA = COMPOUNDS[comp_A]; dB = COMPOUNDS[comp_B]
-    Tlo = min(dA["Tb"], dB["Tb"]) - 5
-    Thi = max(dA["Tb"], dB["Tb"]) + 5
     try:
-        return brentq(obj, Tlo, Thi, xtol=1e-5)
+        return brentq(obj, T_lo, T_hi, xtol=1e-5)
     except Exception:
         return None
 
 def dew_T(comp_A, comp_B, y, P_bar):
     """Temperatura de orvalho (°C) para vapor de composição y a pressão P."""
     P_mmHg = P_bar * 750.062
+    T_A = T_pure(comp_A, P_bar)
+    T_B = T_pure(comp_B, P_bar)
+    T_lo = min(T_A, T_B) - 10
+    T_hi = max(T_A, T_B) + 10
     def obj(T):
         xA = y * P_mmHg / Psat(comp_A, T)
         xB = (1 - y) * P_mmHg / Psat(comp_B, T)
         return xA + xB - 1.0
-    dA = COMPOUNDS[comp_A]; dB = COMPOUNDS[comp_B]
-    Tlo = min(dA["Tb"], dB["Tb"]) - 5
-    Thi = max(dA["Tb"], dB["Tb"]) + 5
     try:
-        return brentq(obj, Tlo, Thi, xtol=1e-5)
+        return brentq(obj, T_lo, T_hi, xtol=1e-5)
     except Exception:
         return None
 
@@ -339,12 +355,23 @@ def build_equilibrium_curves(comp_A, comp_B, P_bar, n_pts=80):
     T_dew_arr = np.zeros(n_pts)
 
     for i, x in enumerate(x_arr):
-        Tb = bubble_T(comp_A, comp_B, x, P_bar)
-        if Tb is None:
-            y_arr[i] = np.nan; HL_arr[i] = np.nan; HV_arr[i] = np.nan
+        # Para x=0 e x=1, evitar problemas numéricos
+        if x == 0.0:
+            Tb = bubble_T(comp_A, comp_B, 0.0, P_bar)
+            y = 0.0
+        elif x == 1.0:
+            Tb = bubble_T(comp_A, comp_B, 1.0, P_bar)
+            y = 1.0
+        else:
+            Tb = bubble_T(comp_A, comp_B, x, P_bar)
+            if Tb is None:
+                y = np.nan
+            else:
+                y = y_from_bubble(comp_A, comp_B, x, Tb, P_bar)
+                y = np.clip(y, 0.0, 1.0)
+        if Tb is None or np.isnan(y):
+            y_arr[i] = np.nan; HL_arr[i] = np.nan; HV_arr[i] = np.nan; T_bub_arr[i] = np.nan; T_dew_arr[i] = np.nan
             continue
-        y = y_from_bubble(comp_A, comp_B, x, Tb, P_bar)
-        y = np.clip(y, 0.0, 1.0)
         y_arr[i]     = y
         HL_arr[i]    = H_mix_L(comp_A, comp_B, x, Tb)    # kJ/mol
         HV_arr[i]    = H_mix_V(comp_A, comp_B, y, Tb)
@@ -380,14 +407,7 @@ def build_isotherms(comp_A, comp_B, P_bar, T_list):
 
         y_bub = x_bub * PsA / P_mmHg  # y na bolha
 
-        # Ponto de orvalho: x = P*y / PsatA,  x*(PsA-PsB) + PsB = P → x já calculado
-        # Na realidade, para uma isoterma T fixo:
-        #   Bolha: (x_bub, y_bub) — composição do vapor que começa a se formar
-        #   Orvalho: outra composição
-        # Para a isoterma no diagrama Hxy, traçamos a linha horizontal em T
-        # do ponto de bolha (x_bub, HL(x_bub,T)) ao ponto de orvalho (y_orv, HV(y_orv,T))
-        # y_orv: 1/sum(y/Psat) = P  → para orvalho: x_A = y*P/PsA, x_B=(1-y)*P/PsB
-        # x_A+x_B=1 → y*(1/PsA - 1/PsB) = 1/PsB - 1/P → y = (1/PsB-1/P)/(1/PsB-1/PsA)
+        # Ponto de orvalho: y_dew
         y_dew = (1/PsB - 1/P_mmHg) / (1/PsB - 1/PsA)
         if not (0 <= y_dew <= 1):
             continue
@@ -541,7 +561,7 @@ def ponchon_savarit(x_arr, y_arr, HL_arr, HV_arr, xD, xW, zF, HD_p, HW_p, q, max
         })
 
         # Critério de troca de seção
-        if in_rect and x1 <= zF:
+        if in_rect and x1 <= zF + 1e-6:
             in_rect = False
 
         # Critério de parada
@@ -863,7 +883,7 @@ with st.sidebar:
     comp_B = st.selectbox("Componente pesado (B)", comp_B_opts,
                           index=1 if len(comp_B_opts) > 1 else 0)
 
-    P_bar = st.slider("Pressão (bar)", 0.10, 10.0, 1.013, 0.01,
+    P_bar = st.slider("Pressão (bar)", 0.20, 5.0, 1.013, 0.01,
                       format="%.3f bar")
 
     st.markdown('<div class="section-header">Especificações da Coluna</div>',
@@ -933,13 +953,24 @@ x_arr  = x_arr[mask];  y_arr  = y_arr[mask]
 HL_arr = HL_arr[mask]; HV_arr = HV_arr[mask]
 T_bub_arr = T_bub_arr[mask]
 
+# Verificar se há dados suficientes
+if len(x_arr) == 0:
+    st.error("❌ Não foi possível calcular curvas de equilíbrio para as condições fornecidas. Tente ajustar a pressão ou escolher outro par de componentes.")
+    st.stop()
+
 # Isotermas
 if show_isotherms:
-    T_min = T_bub_arr.min()
-    T_max = T_bub_arr.max()
-    T_list = np.linspace(T_min + 0.5, T_max - 0.5, 30)
-    with st.spinner("Calculando isotermas…"):
-        isotherms_data = build_isotherms(comp_A, comp_B, P_bar, T_list)
+    if len(T_bub_arr) > 1:
+        T_min = T_bub_arr.min()
+        T_max = T_bub_arr.max()
+        if T_max - T_min > 0.1:
+            T_list = np.linspace(T_min + 0.5, T_max - 0.5, 30)
+        else:
+            T_list = [T_min]
+        with st.spinner("Calculando isotermas…"):
+            isotherms_data = build_isotherms(comp_A, comp_B, P_bar, T_list)
+    else:
+        isotherms_data = []
 else:
     isotherms_data = []
 
