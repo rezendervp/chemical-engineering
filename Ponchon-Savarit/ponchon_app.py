@@ -12,7 +12,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from matplotlib.patches import FancyArrowPatch
-from scipy.optimize import brentq, fsolve
+#from scipy.optimize import brentq, fsolve
 import warnings
 warnings.filterwarnings("ignore")
 
