@@ -29,92 +29,25 @@ st.set_page_config(
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap');
-
-html, body, [class*="css"] {
-    font-family: 'IBM Plex Sans', sans-serif;
-}
-.stApp {
-    background: #0d1b2a;
-    color: #e8f4f8;
-}
-[data-testid="stSidebar"] {
-    background: #112233;
-    border-right: 1px solid #1e3a5f;
-}
-[data-testid="stSidebar"] * {
-    color: #cce0f0 !important;
-}
-.main-title {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 2.1rem;
-    font-weight: 600;
-    color: #4fc3f7;
-    letter-spacing: -1px;
-    margin-bottom: 0;
-    line-height: 1.1;
-}
-.main-sub {
-    font-size: 0.95rem;
-    color: #78909c;
-    margin-top: 4px;
-    font-family: 'IBM Plex Mono', monospace;
-}
-.result-card {
-    background: #1a2f45;
-    border: 1px solid #1e3a5f;
-    border-left: 4px solid #4fc3f7;
-    border-radius: 6px;
-    padding: 12px 16px;
-    margin: 6px 0;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.88rem;
-}
+html, body, [class*="css"] { font-family: 'IBM Plex Sans', sans-serif; }
+.stApp { background: #0d1b2a; color: #e8f4f8; }
+[data-testid="stSidebar"] { background: #112233; border-right: 1px solid #1e3a5f; }
+[data-testid="stSidebar"] * { color: #cce0f0 !important; }
+.main-title { font-family: 'IBM Plex Mono', monospace; font-size: 2.1rem; font-weight: 600; color: #4fc3f7; margin-bottom: 0; }
+.main-sub { font-size: 0.95rem; color: #78909c; font-family: 'IBM Plex Mono', monospace; }
+.result-card { background: #1a2f45; border: 1px solid #1e3a5f; border-left: 4px solid #4fc3f7; border-radius: 6px; padding: 12px 16px; margin: 6px 0; font-family: 'IBM Plex Mono', monospace; font-size: 0.88rem; }
 .result-card.polo-r  { border-left-color: #ab47bc; }
 .result-card.polo-s  { border-left-color: #ff8f00; }
 .result-card.feed    { border-left-color: #26a69a; }
 .result-card.stages  { border-left-color: #ef5350; }
 .result-card.warning { border-left-color: #ffa726; background: #2a1f10; }
-.section-header {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 3px;
-    color: #4fc3f7;
-    text-transform: uppercase;
-    margin: 20px 0 8px 0;
-    border-bottom: 1px solid #1e3a5f;
-    padding-bottom: 4px;
-}
-.stButton > button {
-    background: #1565c0;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.85rem;
-    font-weight: 600;
-    padding: 8px 20px;
-}
+.section-header { font-family: 'IBM Plex Mono', monospace; font-size: 0.75rem; font-weight: 600; letter-spacing: 3px; color: #4fc3f7; text-transform: uppercase; margin: 20px 0 8px 0; border-bottom: 1px solid #1e3a5f; padding-bottom: 4px; }
+.stButton > button { background: #1565c0; color: white; border: none; border-radius: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; font-weight: 600; padding: 8px 20px; }
 .stButton > button:hover { background: #1976d2; }
-.stSlider label, .stSelectbox label {
-    font-size: 0.8rem !important;
-    color: #90caf9 !important;
-    font-family: 'IBM Plex Mono', monospace !important;
-}
-.stTabs [data-baseweb="tab"] {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.8rem;
-    color: #78909c;
-}
-.stTabs [aria-selected="true"] {
-    color: #4fc3f7 !important;
-    border-bottom-color: #4fc3f7 !important;
-}
-.streamlit-expanderHeader {
-    font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 0.82rem !important;
-    color: #90caf9 !important;
-}
+.stSlider label, .stSelectbox label { font-size: 0.8rem !important; color: #90caf9 !important; font-family: 'IBM Plex Mono', monospace !important; }
+.stTabs [data-baseweb="tab"] { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; color: #78909c; }
+.stTabs [aria-selected="true"] { color: #4fc3f7 !important; border-bottom-color: #4fc3f7 !important; }
+.streamlit-expanderHeader { font-family: 'IBM Plex Mono', monospace !important; font-size: 0.82rem !important; color: #90caf9 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -122,62 +55,14 @@ html, body, [class*="css"] {
 #  BANCO DE DADOS TERMODINÂMICOS
 # ═══════════════════════════════════════════════════════════════════════
 COMPOUNDS = {
-    "Benzeno": {
-        "A": 6.90565, "B": 1211.033, "C": 220.790,
-        "Hvap_ref": 30.72, "dHvap_dT": -0.060,
-        "CpL": 0.1350, "CpV": 0.0830,
-        "Tc": 288.9, "Tb": 80.1, "M": 78.11,
-        "color": "#42a5f5",
-    },
-    "Tolueno": {
-        "A": 6.95334, "B": 1343.943, "C": 219.377,
-        "Hvap_ref": 33.18, "dHvap_dT": -0.055,
-        "CpL": 0.1572, "CpV": 0.1030,
-        "Tc": 318.6, "Tb": 110.6, "M": 92.14,
-        "color": "#ef5350",
-    },
-    "Etanol": {
-        "A": 8.11220, "B": 1592.864, "C": 226.184,
-        "Hvap_ref": 38.56, "dHvap_dT": -0.045,
-        "CpL": 0.1120, "CpV": 0.0780,
-        "Tc": 243.1, "Tb": 78.37, "M": 46.07,
-        "color": "#26a69a",
-    },
-    "Água": {
-        "A": 8.07131, "B": 1730.630, "C": 233.426,
-        "Hvap_ref": 44.00, "dHvap_dT": -0.042,
-        "CpL": 0.0754, "CpV": 0.0340,
-        "Tc": 374.1, "Tb": 100.0, "M": 18.02,
-        "color": "#29b6f6",
-    },
-    "n-Heptano": {
-        "A": 6.89386, "B": 1264.370, "C": 216.640,
-        "Hvap_ref": 31.77, "dHvap_dT": -0.063,
-        "CpL": 0.2243, "CpV": 0.1620,
-        "Tc": 267.0, "Tb": 98.4, "M": 100.20,
-        "color": "#ab47bc",
-    },
-    "n-Hexano": {
-        "A": 6.87601, "B": 1171.170, "C": 224.408,
-        "Hvap_ref": 28.85, "dHvap_dT": -0.065,
-        "CpL": 0.1952, "CpV": 0.1430,
-        "Tc": 234.7, "Tb": 68.7, "M": 86.18,
-        "color": "#ff8f00",
-    },
-    "Acetona": {
-        "A": 7.02447, "B": 1161.000, "C": 224.000,
-        "Hvap_ref": 31.27, "dHvap_dT": -0.058,
-        "CpL": 0.1249, "CpV": 0.0740,
-        "Tc": 235.1, "Tb": 56.1, "M": 58.08,
-        "color": "#66bb6a",
-    },
-    "Metanol": {
-        "A": 7.89750, "B": 1474.080, "C": 229.130,
-        "Hvap_ref": 37.43, "dHvap_dT": -0.048,
-        "CpL": 0.0812, "CpV": 0.0480,
-        "Tc": 239.4, "Tb": 64.7, "M": 32.04,
-        "color": "#ffa726",
-    },
+    "Benzeno": {"A":6.90565,"B":1211.033,"C":220.790,"Hvap_ref":30.72,"dHvap_dT":-0.060,"CpL":0.1350,"CpV":0.0830,"Tc":288.9,"Tb":80.1,"M":78.11,"color":"#42a5f5"},
+    "Tolueno": {"A":6.95334,"B":1343.943,"C":219.377,"Hvap_ref":33.18,"dHvap_dT":-0.055,"CpL":0.1572,"CpV":0.1030,"Tc":318.6,"Tb":110.6,"M":92.14,"color":"#ef5350"},
+    "Etanol": {"A":8.11220,"B":1592.864,"C":226.184,"Hvap_ref":38.56,"dHvap_dT":-0.045,"CpL":0.1120,"CpV":0.0780,"Tc":243.1,"Tb":78.37,"M":46.07,"color":"#26a69a"},
+    "Água": {"A":8.07131,"B":1730.630,"C":233.426,"Hvap_ref":44.00,"dHvap_dT":-0.042,"CpL":0.0754,"CpV":0.0340,"Tc":374.1,"Tb":100.0,"M":18.02,"color":"#29b6f6"},
+    "n-Heptano": {"A":6.89386,"B":1264.370,"C":216.640,"Hvap_ref":31.77,"dHvap_dT":-0.063,"CpL":0.2243,"CpV":0.1620,"Tc":267.0,"Tb":98.4,"M":100.20,"color":"#ab47bc"},
+    "n-Hexano": {"A":6.87601,"B":1171.170,"C":224.408,"Hvap_ref":28.85,"dHvap_dT":-0.065,"CpL":0.1952,"CpV":0.1430,"Tc":234.7,"Tb":68.7,"M":86.18,"color":"#ff8f00"},
+    "Acetona": {"A":7.02447,"B":1161.000,"C":224.000,"Hvap_ref":31.27,"dHvap_dT":-0.058,"CpL":0.1249,"CpV":0.0740,"Tc":235.1,"Tb":56.1,"M":58.08,"color":"#66bb6a"},
+    "Metanol": {"A":7.89750,"B":1474.080,"C":229.130,"Hvap_ref":37.43,"dHvap_dT":-0.048,"CpL":0.0812,"CpV":0.0480,"Tc":239.4,"Tb":64.7,"M":32.04,"color":"#ffa726"},
 }
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -366,11 +251,12 @@ def find_y_on_HV_line(xL, HLx, xD, HD_p, x_arr, y_arr, HV_arr, side="rectificati
         lo, hi = xL + 1e-4, 1.0 - 1e-4
     else:
         lo, hi = 1e-4, xL - 1e-4
+    # Aumentar número de pontos para busca
     try:
-        vals = [residual(v) for v in np.linspace(lo, hi, 40)]
+        vals = [residual(v) for v in np.linspace(lo, hi, 100)]
         for k in range(len(vals)-1):
             if vals[k]*vals[k+1] < 0:
-                y1 = brentq(residual, lo+k*(hi-lo)/39, lo+(k+1)*(hi-lo)/39, xtol=1e-6)
+                y1 = brentq(residual, lo+k*(hi-lo)/99, lo+(k+1)*(hi-lo)/99, xtol=1e-6)
                 return y1, interp_HV_from_y(y1, y_arr, HV_arr, x_arr)
     except:
         pass
@@ -384,16 +270,16 @@ def find_x_tieline(y1, x_arr, y_arr, HL_arr):
         return float(np.interp(x, xs, ys)) - y1
     lo, hi = xs[0] + 1e-5, xs[-1] - 1e-5
     try:
-        vals = [res(v) for v in np.linspace(lo, hi, 40)]
+        vals = [res(v) for v in np.linspace(lo, hi, 100)]
         for k in range(len(vals)-1):
             if vals[k]*vals[k+1] < 0:
-                x1 = brentq(res, lo+k*(hi-lo)/39, lo+(k+1)*(hi-lo)/39, xtol=1e-6)
+                x1 = brentq(res, lo+k*(hi-lo)/99, lo+(k+1)*(hi-lo)/99, xtol=1e-6)
                 return x1, interp_HL(x1, x_arr, HL_arr)
     except:
         pass
     return None, None
 
-def ponchon_savarit(x_arr, y_arr, HL_arr, HV_arr, xD, xW, zF, HD_p, HW_p, q, max_stages=50):
+def ponchon_savarit(x_arr, y_arr, HL_arr, HV_arr, xD, xW, zF, HD_p, HW_p, q, max_stages=100):
     HL_xD = interp_HL(xD, x_arr, HL_arr)
     stages = []
     in_rect = True
@@ -434,7 +320,7 @@ def compute_poles(comp_A, comp_B, P_bar, xD, xW, zF, R, q, x_arr, y_arr, HL_arr,
     y_top = y_arr[idx_xD]
     HV_top = interp_HV_from_y(y_top, y_arr, HV_arr, x_arr)
 
-    # Polo de retificação (operação normal)
+    # Polo de retificação
     HD_p = (R + 1) * HV_top - R * HL_xD
 
     # Alimentação
@@ -442,7 +328,7 @@ def compute_poles(comp_A, comp_B, P_bar, xD, xW, zF, R, q, x_arr, y_arr, HL_arr,
     HV_zF = interp_HV_from_y(zF, y_arr, HV_arr, x_arr)
     HF = (1 - q) * HV_zF + q * HL_zF
 
-    # Polo de esgotamento (colinearidade)
+    # Polo de esgotamento
     if abs(xD - zF) < 1e-9:
         HW_p = HF
     else:
@@ -450,8 +336,8 @@ def compute_poles(comp_A, comp_B, P_bar, xD, xW, zF, R, q, x_arr, y_arr, HL_arr,
         HW_p = HF + slope * (xW - zF)
 
     # ----- CÁLCULO DO REFLUXO MÍNIMO (CORRIGIDO) -----
-    # Para cada tie‑line com xL < xD, calcula H'D e guarda apenas os que são > HV_top
-    H_valid = []
+    # Para cada tie‑line, calcula o R correspondente e guarda o menor R positivo
+    R_values = []
     for i in range(len(x_arr)):
         xL = x_arr[i]
         y = y_arr[i]
@@ -459,20 +345,18 @@ def compute_poles(comp_A, comp_B, P_bar, xD, xW, zF, R, q, x_arr, y_arr, HL_arr,
         HV = HV_arr[i]
         if abs(y - xL) < 1e-8:
             continue
-        if xL >= xD:   # Ignora tie‑lines à direita do destilado
+        if xL >= xD:   # líquido mais rico que o destilado – ignorar
             continue
         # Inclinação da tie‑line
         slope_tl = (HV - HL) / (y - xL)
         H_at_xD = HL + slope_tl * (xD - xL)
-        # Só aceita valores fisicamente possíveis (acima da entalpia do vapor de topo)
+        # Só considerar valores fisicamente maiores que HV_top
         if H_at_xD > HV_top + 1e-6:
-            H_valid.append(H_at_xD)
-
-    if H_valid:
-        H_min = min(H_valid)   # menor H'D entre as tie‑lines válidas
-        Rm = (H_min - HV_top) / (HV_top - HL_xD)
-        if Rm < 0:
-            Rm = None   # segurança
+            R_calc = (H_at_xD - HV_top) / (HV_top - HL_xD)
+            if R_calc > 0:
+                R_values.append(R_calc)
+    if R_values:
+        Rm = min(R_values)
     else:
         Rm = None
 
@@ -647,14 +531,12 @@ if len(x_arr) == 0:
     st.error("❌ Não foi possível calcular curvas de equilíbrio. Tente ajustar a pressão ou escolher outro par.")
     st.stop()
 
-if show_isotherms and len(T_bub_arr) > 1:
-    T_min = T_bub_arr.min()
-    T_max = T_bub_arr.max()
+# Isotermas – agora garantindo cobertura de x=0 a x=1
+if show_isotherms:
     T_pure_A = T_pure(comp_A, P_bar)
     T_pure_B = T_pure(comp_B, P_bar)
-    T_min = min(T_min, T_pure_A, T_pure_B)
-    T_max = max(T_max, T_pure_A, T_pure_B)
-    T_list = np.linspace(T_min, T_max, max(10, n_iso*2))
+    # Cria 20 temperaturas entre os puros
+    T_list = np.linspace(T_pure_A, T_pure_B, max(20, n_iso*2))
     with st.spinner("Calculando isotermas…"):
         isotherms_data = build_isotherms(comp_A, comp_B, P_bar, T_list)
 else:
@@ -666,13 +548,16 @@ HD_p, HW_p, HF, Rm, HL_xD, HV_top, y_top = compute_poles(
 
 if Rm is not None and R < Rm:
     st.markdown(f'<div class="result-card warning">⛔ R = {R:.2f} < R_min ≈ {Rm:.3f} — Separação impossível com este refluxo!</div>', unsafe_allow_html=True)
-
-stages = []
-if show_stages:
-    with st.spinner("Calculando estágios…"):
-        stages, HF_calc = ponchon_savarit(x_arr, y_arr, HL_arr, HV_arr, xD, xW, zF, HD_p, HW_p, q, max_stages=50)
-        if not stages:
-            st.warning("⚠️ Nenhum estágio foi calculado. Tente aumentar o refluxo (R) ou ajustar as composições.")
+else:
+    # Só calcula estágios se R >= Rmin
+    stages = []
+    if show_stages:
+        with st.spinner("Calculando estágios…"):
+            stages, HF_calc = ponchon_savarit(x_arr, y_arr, HL_arr, HV_arr, xD, xW, zF, HD_p, HW_p, q, max_stages=100)
+            if not stages:
+                st.warning("⚠️ Nenhum estágio foi calculado. Tente aumentar o refluxo (R) ou ajustar as composições.")
+else:
+    stages = []
 
 col_plot, col_info = st.columns([2.6, 1.0])
 
