@@ -10,6 +10,7 @@ simulação, atualizar resultados) fica em main_window.py.
 """
 
 import customtkinter as ctk
+import numpy as np
 from app.core.mesh import Mesh2D
 from app.core.bc import ContornosRetangulo
 from app.core import solver as sv
@@ -99,18 +100,45 @@ class PainelEntrada(ctk.CTkScrollableFrame):
         self.ent_omega = ctk.CTkEntry(self.frame_solver, width=90)
         self.ent_omega.insert(0, "1.85")
 
-        ctk.CTkLabel(self.frame_solver, text="Tolerância:").grid(row=2, column=0, sticky="w", pady=(4, 0))
+        self.lbl_tol = ctk.CTkLabel(self.frame_solver, text="Tolerância:")
         self.ent_tol = ctk.CTkEntry(self.frame_solver, width=90)
         self.ent_tol.insert(0, "1e-7")
-        self.ent_tol.grid(row=2, column=1, sticky="w", padx=(6, 0), pady=(4, 0))
 
-        ctk.CTkLabel(self.frame_solver, text="Máx. iterações:").grid(row=3, column=0, sticky="w", pady=(4, 0))
+        self.lbl_maxiter = ctk.CTkLabel(self.frame_solver, text="Máx. iterações:")
         self.ent_maxiter = ctk.CTkEntry(self.frame_solver, width=90)
         self.ent_maxiter.insert(0, "30000")
-        self.ent_maxiter.grid(row=3, column=1, sticky="w", padx=(6, 0), pady=(4, 0))
+
+        self.lbl_nota_direto = ctk.CTkLabel(
+            self.frame_solver, text="Solver direto: solução exata via decomposição LU\n"
+                                     "esparsa -- sem iterações, sem tolerância.",
+            text_color="gray60", font=ctk.CTkFont(size=11), justify="left")
+
+        self._secao("7. Amostragem de ponto (opcional)")
+        f_amostra = ctk.CTkFrame(self, fg_color="transparent", height=1)
+        f_amostra.pack(fill="x", padx=10, pady=(0, 8))
+        self.chk_amostra = ctk.CTkCheckBox(f_amostra, text="Acompanhar T num ponto durante a solução",
+                                            command=self._on_amostra_toggle)
+        self.chk_amostra.grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 4))
+        ctk.CTkLabel(f_amostra, text="x [m]:").grid(row=1, column=0, sticky="w")
+        self.ent_amostra_x = ctk.CTkEntry(f_amostra, width=80, state="disabled")
+        self.ent_amostra_x.insert(0, "0.0")
+        self.ent_amostra_x.grid(row=1, column=1, sticky="w", padx=(4, 12))
+        ctk.CTkLabel(f_amostra, text="y [m]:").grid(row=1, column=2, sticky="w")
+        self.ent_amostra_y = ctk.CTkEntry(f_amostra, width=80, state="disabled")
+        self.ent_amostra_y.insert(0, "0.0")
+        self.ent_amostra_y.grid(row=1, column=3, sticky="w", padx=(4, 0))
+        ctk.CTkLabel(f_amostra, text="Gera o gráfico 'T no ponto x iteração/tempo' na aba Perfis.",
+                     text_color="gray60", font=ctk.CTkFont(size=11)).grid(
+            row=2, column=0, columnspan=4, sticky="w", pady=(4, 0))
 
         self._on_solver_change(self.opt_solver.get())
         self._atualizar_labels()
+
+    # -----------------------------------------------------------------
+    def _on_amostra_toggle(self):
+        estado = "normal" if self.chk_amostra.get() else "disabled"
+        self.ent_amostra_x.configure(state=estado)
+        self.ent_amostra_y.configure(state=estado)
 
     # -----------------------------------------------------------------
     def _secao(self, texto):
@@ -180,6 +208,19 @@ class PainelEntrada(ctk.CTkScrollableFrame):
         else:
             self.lbl_omega.grid_forget()
             self.ent_omega.grid_forget()
+
+        if valor == "Direto":
+            self.lbl_tol.grid_forget()
+            self.ent_tol.grid_forget()
+            self.lbl_maxiter.grid_forget()
+            self.ent_maxiter.grid_forget()
+            self.lbl_nota_direto.grid(row=4, column=0, columnspan=2, sticky="w", pady=(4, 0))
+        else:
+            self.lbl_nota_direto.grid_forget()
+            self.lbl_tol.grid(row=2, column=0, sticky="w", pady=(4, 0))
+            self.ent_tol.grid(row=2, column=1, sticky="w", padx=(6, 0), pady=(4, 0))
+            self.lbl_maxiter.grid(row=3, column=0, sticky="w", pady=(4, 0))
+            self.ent_maxiter.grid(row=3, column=1, sticky="w", padx=(6, 0), pady=(4, 0))
 
     def _usar_dt_critico(self):
         try:
@@ -280,4 +321,87 @@ class PainelEntrada(ctk.CTkScrollableFrame):
                         f"Δt = {params['dt']:.4g} s excede o Δt crítico ({dtc:.4g} s) "
                         f"para o esquema explícito -- a solução será instável. "
                         f"Reduza Δt ou use o esquema implícito.")
+
+        if self.chk_amostra.get():
+            try:
+                xa = float(self.ent_amostra_x.get())
+                ya = float(self.ent_amostra_y.get())
+            except ValueError:
+                raise ValueError("Ponto de amostragem: coordenadas x,y inválidas.")
+            if not (0 <= xa <= mesh.Lx and 0 <= ya <= mesh.Ly):
+                raise ValueError(f"Ponto de amostragem ({xa}, {ya}) fora do domínio "
+                                  f"[0,{mesh.Lx}] x [0,{mesh.Ly}].")
+            i = int(np.clip(round(xa / mesh.dx), 0, mesh.Nx - 1))
+            j = int(np.clip(round(ya / mesh.dy), 0, mesh.Ny - 1))
+            params["idx_amostra"] = mesh.idx(i, j)
+            params["amostra_xy_real"] = (mesh.x[i], mesh.y[j])
+
         return params
+
+    # -----------------------------------------------------------------
+    def exportar_config(self) -> dict:
+        """Serializa todos os campos da GUI (valores brutos, como texto) para salvar em JSON."""
+        cfg = {
+            "Lx": self.ent_Lx.get(), "Ly": self.ent_Ly.get(),
+            "Nx": self.ent_Nx.get(), "Ny": self.ent_Ny.get(),
+            "material": self.frame_material.exportar_config(),
+            "bc_esquerda": self.bc_esquerda.exportar_config(),
+            "bc_direita": self.bc_direita.exportar_config(),
+            "bc_inferior": self.bc_inferior.exportar_config(),
+            "bc_superior": self.bc_superior.exportar_config(),
+            "regime": self.seg_regime.get(),
+            "T_inicial": self.ent_Tini.get(),
+            "esquema": self.seg_esquema.get() if hasattr(self, "seg_esquema") else "Explícito",
+            "dt": self.ent_dt.get() if hasattr(self, "ent_dt") else "1.0",
+            "t_final": self.ent_tfinal.get() if hasattr(self, "ent_tfinal") else "60.0",
+            "n_frames": self.ent_nframes.get() if hasattr(self, "ent_nframes") else "80",
+            "fps": self.ent_fps.get() if hasattr(self, "ent_fps") else "12",
+            "solver": self.opt_solver.get(),
+            "omega": self.ent_omega.get(),
+            "tolerancia": self.ent_tol.get(),
+            "max_iter": self.ent_maxiter.get(),
+            "amostra_habilitada": bool(self.chk_amostra.get()),
+            "amostra_x": self.ent_amostra_x.get(),
+            "amostra_y": self.ent_amostra_y.get(),
+        }
+        return cfg
+
+    def importar_config(self, cfg: dict):
+        """Repopula todos os campos da GUI a partir de um dict salvo por exportar_config()."""
+        def set_entry(entry, valor):
+            entry.delete(0, "end")
+            entry.insert(0, str(valor))
+
+        set_entry(self.ent_Lx, cfg["Lx"]); set_entry(self.ent_Ly, cfg["Ly"])
+        set_entry(self.ent_Nx, cfg["Nx"]); set_entry(self.ent_Ny, cfg["Ny"])
+        self.frame_material.importar_config(cfg["material"])
+        self.bc_esquerda.importar_config(cfg["bc_esquerda"])
+        self.bc_direita.importar_config(cfg["bc_direita"])
+        self.bc_inferior.importar_config(cfg["bc_inferior"])
+        self.bc_superior.importar_config(cfg["bc_superior"])
+
+        self.seg_regime.set(cfg["regime"])
+        self._on_regime_change(cfg["regime"])
+        set_entry(self.ent_Tini, cfg["T_inicial"])
+        if hasattr(self, "seg_esquema"):
+            self.seg_esquema.set(cfg.get("esquema", "Explícito"))
+            set_entry(self.ent_dt, cfg.get("dt", "1.0"))
+            set_entry(self.ent_tfinal, cfg.get("t_final", "60.0"))
+            set_entry(self.ent_nframes, cfg.get("n_frames", "80"))
+            set_entry(self.ent_fps, cfg.get("fps", "12"))
+
+        self.opt_solver.set(cfg["solver"])
+        self._on_solver_change(cfg["solver"])
+        set_entry(self.ent_omega, cfg["omega"])
+        set_entry(self.ent_tol, cfg["tolerancia"])
+        set_entry(self.ent_maxiter, cfg["max_iter"])
+
+        if cfg.get("amostra_habilitada"):
+            self.chk_amostra.select()
+        else:
+            self.chk_amostra.deselect()
+        self._on_amostra_toggle()
+        set_entry(self.ent_amostra_x, cfg.get("amostra_x", "0.0"))
+        set_entry(self.ent_amostra_y, cfg.get("amostra_y", "0.0"))
+
+        self._atualizar_labels()

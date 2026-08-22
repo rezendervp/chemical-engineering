@@ -200,7 +200,15 @@ def build_steady_system(A, F, dirichlet_mask, dirichlet_vals):
 
 
 def build_implicit_system(A, F, dirichlet_mask, dirichlet_vals, T_n, dt, alpha):
-    """Monta M @ T_new = b para um passo de Euler implícito (backward Euler)."""
+    """Monta M @ T_new = b para um passo de Euler implícito (backward Euler).
+
+    ATENÇÃO -- uso recomendado apenas para UM passo isolado. Para uma série
+    de passos de tempo (o caso comum), M não muda de um passo para o outro
+    (só depende de A, dt, alpha -- todos constantes); rebuildar a matriz
+    inteira a cada passo é desperdício e pode travar a interface em
+    simulações longas. Para séries de passos, use
+    `build_implicit_matrix` (uma vez) + `build_implicit_rhs` (a cada passo).
+    """
     N = A.shape[0]
     I = sp.identity(N, format="csr")
     M = (I - dt * alpha * A).tolil()
@@ -211,6 +219,50 @@ def build_implicit_system(A, F, dirichlet_mask, dirichlet_vals, T_n, dt, alpha):
         M.data[p] = [1.0]
         b[p] = dirichlet_vals[p]
     return M.tocsr(), b
+
+
+def build_implicit_matrix(A, dirichlet_mask, dt, alpha):
+    """
+    Monta APENAS a matriz M = I - dt*alpha*A do esquema implícito, com as
+    linhas Dirichlet substituídas por identidade -- construída UMA VEZ e
+    reaproveitada em todos os passos de tempo (M não depende de T_n).
+    """
+    N = A.shape[0]
+    I = sp.identity(N, format="csr")
+    M = (I - dt * alpha * A).tolil()
+    idx_dir = np.where(dirichlet_mask)[0]
+    for p in idx_dir:
+        M.rows[p] = [p]
+        M.data[p] = [1.0]
+    return M.tocsr()
+
+
+def build_implicit_rhs(F, dirichlet_mask, dirichlet_vals, T_n, dt, alpha):
+    """
+    Monta APENAS o vetor b = T_n + dt*alpha*F do esquema implícito (com os
+    nós Dirichlet sobrescritos), para ser usado junto de uma matriz M já
+    construída por `build_implicit_matrix`. Operação O(N), rápida --
+    chamada a cada passo de tempo sem custo relevante.
+    """
+    b = T_n + dt * alpha * F
+    b[dirichlet_mask] = dirichlet_vals[dirichlet_mask]
+    return b
+
+
+def fatorar_direto(M):
+    """
+    Fatoração LU esparsa reutilizável (scipy.sparse.linalg.splu). Para o
+    esquema implícito com solver 'direto', M é CONSTANTE ao longo de todos
+    os passos de tempo -- fatorar uma vez e reutilizar (apenas substituições
+    triangulares, O(nnz), a cada passo) é ordens de magnitude mais rápido
+    que refazer a fatoração completa a cada passo.
+    """
+    return spla.splu(M.tocsc())
+
+
+def resolver_direto_fatorado(lu, b):
+    """Resolve M @ T = b usando uma fatoração LU já calculada por `fatorar_direto`."""
+    return lu.solve(b)
 
 
 def passo_explicito(A, F, dirichlet_mask, dirichlet_vals, T_n, dt, alpha):
@@ -240,7 +292,7 @@ def resolver_jacobi(M, b, T0, tol=1e-8, max_iter=20000, callback=None, callback_
         hist.append(res)
         T = T_new
         if callback is not None and (it % callback_step == 0 or res < tol):
-            callback(it + 1, res)
+            callback(it + 1, res, T_new)
         if res < tol:
             return T, np.array(hist), it + 1, True
     return T, np.array(hist), max_iter, False
@@ -260,7 +312,7 @@ def resolver_gauss_seidel(M, b, T0, tol=1e-8, max_iter=20000, callback=None, cal
         hist.append(res)
         T = T_new
         if callback is not None and (it % callback_step == 0 or res < tol):
-            callback(it + 1, res)
+            callback(it + 1, res, T_new)
         if res < tol:
             return T, np.array(hist), it + 1, True
     return T, np.array(hist), max_iter, False
@@ -283,7 +335,7 @@ def resolver_sor(M, b, T0, omega=1.7, tol=1e-8, max_iter=20000, callback=None, c
         hist.append(res)
         T = T_new
         if callback is not None and (it % callback_step == 0 or res < tol):
-            callback(it + 1, res)
+            callback(it + 1, res, T_new)
         if res < tol:
             return T, np.array(hist), it + 1, True
     return T, np.array(hist), max_iter, False
@@ -292,7 +344,7 @@ def resolver_sor(M, b, T0, omega=1.7, tol=1e-8, max_iter=20000, callback=None, c
 def resolver_direto(M, b, T0=None, callback=None, callback_step=5, **kwargs):
     T = spla.spsolve(M.tocsc(), b)
     if callback is not None:
-        callback(1, 0.0)
+        callback(1, 0.0, T)
     return T, np.array([]), 1, True
 
 

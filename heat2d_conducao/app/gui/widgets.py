@@ -93,6 +93,18 @@ class FrameBC(ctk.CTkFrame):
         except ValueError as e:
             raise ValueError(f"Face {self.nome_face}: valor inválido ({e})")
 
+    def exportar_config(self) -> dict:
+        return {"tipo_label": self.opt_tipo.get(),
+                "params": {k: v.get() for k, v in self._entradas.items()}}
+
+    def importar_config(self, cfg: dict):
+        self.opt_tipo.set(cfg["tipo_label"])
+        self._on_tipo_change(cfg["tipo_label"])
+        for k, v in cfg.get("params", {}).items():
+            if k in self._entradas:
+                self._entradas[k].delete(0, "end")
+                self._entradas[k].insert(0, v)
+
 
 class FrameMaterial(ctk.CTkFrame):
     """Seleção de material: banco pré-definido ou propriedades customizadas."""
@@ -155,3 +167,16 @@ class FrameMaterial(ctk.CTkFrame):
             return material_customizado(nome, rho, cp, k)
         except ValueError as e:
             raise ValueError(f"Material customizado: valor inválido ({e})")
+
+    def exportar_config(self) -> dict:
+        return {"material": self.opt_material.get(),
+                "custom": {k: v.get() for k, v in self._entradas_custom.items()}}
+
+    def importar_config(self, cfg: dict):
+        self.opt_material.set(cfg["material"])
+        self._on_change(cfg["material"])
+        for k, v in cfg.get("custom", {}).items():
+            if k in self._entradas_custom:
+                self._entradas_custom[k].delete(0, "end")
+                self._entradas_custom[k].insert(0, v)
+        self._atualizar_alpha()
