@@ -85,6 +85,10 @@ class PainelEntrada(ctk.CTkScrollableFrame):
         self.frame_transiente = ctk.CTkFrame(self, fg_color=("gray90", "gray17"), height=1)
         self._montar_frame_transiente()
 
+        # sub-painel exclusivo do regime permanente (Δt de relaxação)
+        self.frame_permanente = ctk.CTkFrame(self, fg_color=("gray90", "gray17"), height=1)
+        self._montar_frame_permanente()
+
         self._secao("6. Método de solução")
         self.frame_solver = ctk.CTkFrame(self, fg_color="transparent", height=1)
         self.frame_solver.pack(fill="x", padx=10, pady=(0, 8))
@@ -115,8 +119,11 @@ class PainelEntrada(ctk.CTkScrollableFrame):
 
         self.lbl_nota_explicito = ctk.CTkLabel(
             self.frame_solver,
-            text="Esquema explícito: não há sistema linear a resolver a cada\n"
-                 "passo -- a escolha de solver acima não tem efeito aqui.",
+            text="Esquema explícito: M = I (identidade) -- o sistema é trivial\n"
+                 "e já vem resolvido em 0 iterações (T^(n+1) = T^n + Δt·α·(A·T^n+F),\n"
+                 "direto). Os campos acima ficam desabilitados porque não têm\n"
+                 "efeito algum aqui -- não é que 'não exista' sistema, é que ele\n"
+                 "é diagonal e não precisa de solver.",
             text_color="#e07b00", font=ctk.CTkFont(size=11), justify="left")
 
         self._secao("7. Amostragem de ponto (opcional)")
@@ -139,7 +146,8 @@ class PainelEntrada(ctk.CTkScrollableFrame):
 
         self._on_solver_change(self.opt_solver.get())
         self._atualizar_labels()
-        self._on_esquema_change()
+        self._usar_dt_relax_sugerido()  # preenche com um Δt grande por padrão (≈ direto)
+        self._on_regime_change(self.seg_regime.get())
 
     # -----------------------------------------------------------------
     def _on_amostra_toggle(self):
@@ -194,11 +202,55 @@ class PainelEntrada(ctk.CTkScrollableFrame):
         for ent in (self.ent_dt,):
             ent.bind("<KeyRelease>", lambda e: self._atualizar_labels())
 
+    def _montar_frame_permanente(self):
+        f = self.frame_permanente
+        for w in f.winfo_children():
+            w.destroy()
+        f.grid_columnconfigure((1, 3), weight=1)
+
+        info = ctk.CTkLabel(
+            f, text="Δt de RELAXAÇÃO (não físico): mesma formulação algébrica\n"
+                    "do transiente, (I-Δt·α·A)T=T_ant+Δt·α·F, usada aqui como\n"
+                    "artifício numérico -- análogo ao ω do SOR. Δt grande ≈\n"
+                    "comportamento quase direto; Δt pequeno = relaxação mais\n"
+                    "lenta e gradual (mais passos até fechar o sistema).",
+            text_color="gray60", font=ctk.CTkFont(size=11), justify="left")
+        info.grid(row=0, column=0, columnspan=4, sticky="w", padx=8, pady=(8, 4))
+
+        ctk.CTkLabel(f, text="Δt relaxação [s]:").grid(row=1, column=0, sticky="w", padx=8, pady=2)
+        self.ent_dt_relax = ctk.CTkEntry(f, width=110)
+        self.ent_dt_relax.insert(0, "1.0")
+        self.ent_dt_relax.grid(row=1, column=1, sticky="ew", padx=(4, 8), pady=2)
+        btn_sugerir = ctk.CTkButton(f, text="sugerir Δt grande (≈ direto)", width=160,
+                                     command=self._usar_dt_relax_sugerido)
+        btn_sugerir.grid(row=1, column=2, columnspan=2, sticky="ew", padx=(0, 8), pady=2)
+
+        ctk.CTkLabel(f, text="Máx. passos de relaxação:").grid(row=2, column=0, sticky="w",
+                                                                 padx=8, pady=(2, 8))
+        self.ent_max_passos_relax = ctk.CTkEntry(f, width=90)
+        self.ent_max_passos_relax.insert(0, "200")
+        self.ent_max_passos_relax.grid(row=2, column=1, sticky="ew", padx=(4, 8), pady=(2, 8))
+
+    def _usar_dt_relax_sugerido(self):
+        try:
+            Lx = float(self.ent_Lx.get()); Ly = float(self.ent_Ly.get())
+            Nx = int(self.ent_Nx.get()); Ny = int(self.ent_Ny.get())
+            mesh = Mesh2D(Lx, Ly, Nx, Ny)
+            mat = self.frame_material.obter_material()
+            dt_sug = sv.dt_relaxacao_sugerido(mat.alpha, mesh.dx, mesh.dy)
+            self.ent_dt_relax.delete(0, "end")
+            self.ent_dt_relax.insert(0, f"{dt_sug:.6g}")
+        except Exception:
+            pass
+
     def _on_regime_change(self, valor):
+        widget_ref = self._widget_secao6()
         if valor == "Transiente":
-            self.frame_transiente.pack(fill="x", padx=10, pady=(0, 8), before=self._widget_secao6())
+            self.frame_permanente.pack_forget()
+            self.frame_transiente.pack(fill="x", padx=10, pady=(0, 8), before=widget_ref)
         else:
             self.frame_transiente.pack_forget()
+            self.frame_permanente.pack(fill="x", padx=10, pady=(0, 8), before=widget_ref)
         self._atualizar_labels()
         self._on_esquema_change()
 
@@ -335,6 +387,15 @@ class PainelEntrada(ctk.CTkScrollableFrame):
         if solver_metodo == "sor":
             params["omega"] = float(self.ent_omega.get())
 
+        if regime == "permanente":
+            try:
+                params["dt_relaxacao"] = float(self.ent_dt_relax.get())
+            except ValueError:
+                raise ValueError("Δt de relaxação: valor inválido.")
+            if params["dt_relaxacao"] <= 0:
+                raise ValueError("Δt de relaxação deve ser positivo.")
+            params["max_passos_relax"] = int(self.ent_max_passos_relax.get())
+
         if regime == "transiente":
             params["esquema"] = "explicito" if self.seg_esquema.get() == "Explícito" else "implicito"
             params["dt"] = float(self.ent_dt.get())
@@ -378,6 +439,8 @@ class PainelEntrada(ctk.CTkScrollableFrame):
             "bc_superior": self.bc_superior.exportar_config(),
             "regime": self.seg_regime.get(),
             "T_inicial": self.ent_Tini.get(),
+            "dt_relaxacao": self.ent_dt_relax.get(),
+            "max_passos_relax": self.ent_max_passos_relax.get(),
             "esquema": self.seg_esquema.get() if hasattr(self, "seg_esquema") else "Explícito",
             "dt": self.ent_dt.get() if hasattr(self, "ent_dt") else "1.0",
             "t_final": self.ent_tfinal.get() if hasattr(self, "ent_tfinal") else "60.0",

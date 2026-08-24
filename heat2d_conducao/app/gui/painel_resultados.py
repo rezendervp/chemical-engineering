@@ -107,10 +107,13 @@ class AbaConvergencia(AbaCanvas):
         """
         modo="iteracao" -- regime permanente: x = iteração algébrica (Δt é
                             só um artifício de relaxação numérica aqui)
-        modo="tempo"     -- regime transiente: x = tempo físico [s] (Δt tem
-                            significado físico, T carrega a condição inicial)
-        Nos dois casos o y é a MESMA grandeza: ‖A·T + F‖ normalizado (ver
-        solver.residuo_pde) -- por isso o rótulo do eixo y é idêntico.
+        modo="tempo"     -- regime transiente: x = tempo físico [s]
+        Em AMBOS os casos, y = resíduo do FECHAMENTO DO BALANÇO DE ENERGIA
+        discreto (‖M·T-b‖/‖b‖) -- acúmulo - (E_entra - E_sai) = 0. Isto é
+        erro de verdade (falha em satisfazer a 1ª Lei numericamente) e deve
+        ficar ≤ tolerância em TODO passo/iteração -- não é "distância do
+        regime permanente" (isso não seria erro nenhum: um transiente pode
+        estar longe do equilíbrio com o balanço perfeitamente fechado).
         """
         self._modo = modo
         self.canvas.get_tk_widget().destroy()
@@ -126,14 +129,15 @@ class AbaConvergencia(AbaCanvas):
             self.ax.set_title(f"Convergência -- regime permanente{' -- ' + metodo if metodo else ''}")
         else:
             self.ax.set_xlabel("Tempo [s]")
-            self.ax.set_title(f"Aproximação do regime permanente{' -- ' + metodo if metodo else ''}")
-        self.ax.set_ylabel(r"Resíduo  $\|A{\cdot}T+F\|\,/\,\|b\|$")
+            self.ax.set_title(f"Fechamento do balanço de energia por passo"
+                               f"{' -- ' + metodo if metodo else ''}")
+        self.ax.set_ylabel(r"Resíduo do balanço  $\|M{\cdot}T-b\|\,/\,\|b\|$")
         self.ax.grid(True, which="both", linestyle="--", linewidth=0.5)
         (self._linha,) = self.ax.plot([], [], color="#1f77b4", lw=1.6, marker=".", markersize=4)
         self._its, self._res = [], []
         self.fig.text(0.5, 0.005,
-                       "Resíduo algébrico ‖A·T − b‖ (fechamento do sistema discreto) -- "
-                       "NÃO é o erro de truncamento da discretização frente à EDP contínua.",
+                       "Acúmulo − (E_entra − E_sai) = 0 (1ª Lei, forma discreta) -- "
+                       "deve ficar ≤ tolerância em TODO passo/iteração.",
                        ha="center", va="bottom", fontsize=8, color="0.5", style="italic")
         self.fig.tight_layout(rect=[0, 0.03, 1, 1])
         self.canvas.draw()
@@ -240,6 +244,11 @@ class AbaAnimacao(AbaCanvas):
         cf = self._ax.contourf(self.mesh.X, self.mesh.Y, self.frames[idx], levels=40,
                                 cmap=self.cmap, vmin=self._vmin, vmax=self._vmax)
         self._ax.set_title(f"t = {self.tempos[idx]:.3g} s")
+        # ATUALIZA a colorbar existente para o novo mappable -- sem isso, ela
+        # fica congelada com a formatação/ticks do PRIMEIRO quadro (que costuma
+        # ser quase uniforme, perto da condição inicial), mesmo com vmin/vmax
+        # corretos passados ao contourf de cada frame.
+        self._colorbar.update_normal(cf)
         self.canvas.draw_idle()
         self.lbl_tempo.configure(text=f"t = {self.tempos[idx]:.3g} s")
 

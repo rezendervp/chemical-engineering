@@ -391,6 +391,24 @@ def resolver(metodo: str, M, b, T0, **kwargs):
 # Fluxo de calor (Lei de Fourier), para pós-processamento/visualização
 # ---------------------------------------------------------------------------
 
+def dt_relaxacao_sugerido(alpha: float, dx: float, dy: float) -> float:
+    """
+    Sugestão de Δt de relaxação para o regime permanente, usado como valor
+    inicial no campo editável da GUI (o usuário pode mudar livremente).
+
+    Não é um limite físico como dt_critico -- é só um ponto de partida
+    razoável: um Δt bem maior que a escala difusiva característica da malha
+    faz com que M = I - Δt·α·A fique dominado pelo termo -Δt·α·A, e como a
+    matriz de iteração de Jacobi/GS/SOR é invariante à escala da matriz
+    (D⁻¹(L+U) não muda ao multiplicar M inteira por uma constante), isso
+    reproduz de perto o comportamento do sistema direto clássico A·T=-F
+    (poucos passos de relaxação até convergir). Reduzir Δt manualmente
+    torna a relaxação mais lenta e gradual -- útil para ver o efeito do
+    parâmetro, análogo ao ω do SOR.
+    """
+    return 1.0e6 * dt_critico(alpha, dx, dy)
+
+
 def norma_referencia_permanente(F, dirichlet_mask, dirichlet_vals):
     """
     Norma do vetor 'b' do sistema permanente (F com os nós Dirichlet

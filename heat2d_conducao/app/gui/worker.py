@@ -82,18 +82,45 @@ class SimulacaoWorker(threading.Thread):
 
     # -----------------------------------------------------------------
     def _rodar_permanente(self, p, mesh, A, F, dmask, dvals, idx_amostra):
-        self.fila.put(("status", f"Resolvendo regime permanente ({p['solver_metodo']})..."))
-        M, b = sv.build_steady_system(A, F, dmask, dvals)
-        T0 = np.full(mesh.n_nos, p["T_inicial"])
+        """
+        Regime permanente = mesma formulação algébrica do transiente,
+        (I - Δt·α·A)@T = T_ant + Δt·α·F, com Δt como parâmetro de RELAXAÇÃO
+        numérica (não físico) -- análogo ao ω do SOR: Δt grande ~ comporta-
+        mento quase direto (poucos passos de relaxação); Δt pequeno ~
+        relaxação mais lenta e gradual. O usuário controla Δt livremente.
 
-        res0_ref = {"valor": None}  # primeiro resíduo, usado como referência p/ progresso em log
+        Cada "passo de relaxação" resolve o sistema daquele passo (via
+        Jacobi/GS/SOR/direto, plenamente convergido dentro do passo) e então
+        atualiza T_ant = T_novo para o próximo passo, até o resíduo
+        estacionário ‖A·T+F‖ (mesma métrica usada no transiente) cair abaixo
+        da tolerância. A contagem de iteração mostrada ao usuário é GLOBAL
+        (soma das iterações internas de todos os passos de relaxação) --
+        com o Δt padrão (grande), isso reproduz de perto o comportamento do
+        sistema direto clássico A·T=-F em um único passo.
+        """
+        alpha = p["material"].alpha
+        dt = p["dt_relaxacao"]
+        max_passos = p.get("max_passos_relax", 200)
+        norma_ref = sv.norma_referencia_permanente(F, dmask, dvals)
 
-        def cb(it, res, T_atual):
+        self.fila.put(("status", f"Regime permanente via relaxação (Δt={dt:.4g} s, "
+                                  f"{p['solver_metodo']})..."))
+        M = sv.build_implicit_matrix(A, dmask, dt, alpha)
+
+        T = np.full(mesh.n_nos, p["T_inicial"])
+        T[dmask] = dvals[dmask]
+
+        res0_ref = {"valor": None}
+        it_global = {"valor": 0}
+
+        def cb(it_local, res, T_atual):
             self._checar_cancelamento()
+            it_global["valor"] += 1
+            itg = it_global["valor"]
             if res0_ref["valor"] is None and res > 0:
                 res0_ref["valor"] = res
-            self.fila.put(("convergencia", it, res))
-            if it % 5 == 0 or res < p["tolerancia"]:
+            self.fila.put(("convergencia", itg, res))
+            if itg % 5 == 0 or res < p["tolerancia"]:
                 tol = max(p["tolerancia"], 1e-300)
                 r0 = res0_ref["valor"] or res
                 if res > 0 and r0 > tol:
@@ -101,20 +128,35 @@ class SimulacaoWorker(threading.Thread):
                 else:
                     frac = 1.0
                 self.fila.put(("progresso", float(np.clip(frac, 0.0, 1.0))))
-                self.fila.put(("status", f"Iteração {it}  |  resíduo = {res:.3e}"))
+                self.fila.put(("status", f"Passo de relaxação {passo_atual[0]}  |  "
+                                          f"iteração global {itg}  |  resíduo = {res:.3e}"))
             if idx_amostra is not None:
-                self.fila.put(("amostra", it, float(T_atual[idx_amostra])))
+                self.fila.put(("amostra", itg, float(T_atual[idx_amostra])))
 
-        kwargs = dict(tol=p["tolerancia"], max_iter=p["max_iter"], callback=cb)
-        if p["solver_metodo"] == "sor":
-            kwargs["omega"] = p["omega"]
-        T, hist, n_iter, convergiu = sv.resolver(p["solver_metodo"], M, b, T0, **kwargs)
+        passo_atual = [0]
+        convergiu = False
+        n_iter_total = 0
+        for passo in range(1, max_passos + 1):
+            self._checar_cancelamento()
+            passo_atual[0] = passo
+            b = sv.build_implicit_rhs(F, dmask, dvals, T, dt, alpha)
+            kwargs = dict(tol=p["tolerancia"], max_iter=p["max_iter"], callback=cb)
+            if p["solver_metodo"] == "sor":
+                kwargs["omega"] = p["omega"]
+            T, hist, n_iter, _ = sv.resolver(p["solver_metodo"], M, b, T.copy(), **kwargs)
+            n_iter_total += n_iter
+
+            residuo_estacionario = sv.residuo_pde(A, F, T, norma_ref)
+            if residuo_estacionario < p["tolerancia"]:
+                convergiu = True
+                break
 
         resultado = {
             "tipo": "permanente",
             "T_campo": mesh.para_campo(T),
-            "hist_convergencia": hist,
-            "n_iter": n_iter,
+            "hist_convergencia": np.array([]),
+            "n_iter": n_iter_total,
+            "n_passos_relaxacao": passo,
             "convergiu": convergiu,
         }
         self.fila.put(("progresso", 1.0))
@@ -138,15 +180,16 @@ class SimulacaoWorker(threading.Thread):
         tempos = [0.0]
         t = 0.0
 
-        # norma de referência para o resíduo -- MESMA usada em regime permanente
-        # (ver residuo_pde), garantindo que o erro seja reportado na mesma escala
-        # nos dois regimes
-        norma_ref = sv.norma_referencia_permanente(F, dmask, dvals)
-
+        # resíduo = FECHAMENTO DO BALANÇO DE ENERGIA DISCRETO no passo (‖M·T-b‖
+        # do sistema linear DAQUELE passo específico) -- isto sim é erro: mede
+        # se acúmulo - (E_entra - E_sai) = 0 foi satisfeito numericamente.
+        # NÃO é a distância do regime permanente (essa não é erro nenhum --
+        # um transiente estar longe do equilíbrio não viola conservação de
+        # energia alguma; o balanço pode fechar perfeitamente em cada passo
+        # mesmo estando longe do estado estacionário).
         self.fila.put(("status", f"Regime transiente ({esquema}): {n_passos} passos..."))
         self.fila.put(("frame_transiente", 0.0, frames[0]))
-        self.fila.put(("convergencia_passo", 0.0,
-                        max(sv.residuo_pde(A, F, T, norma_ref), 1e-300)))
+        self.fila.put(("convergencia_passo", 0.0, 1e-300))  # t=0: T=condição inicial, sem passo ainda
 
         # --- pré-computação para o esquema implícito (feita UMA VEZ, fora do laço) ---
         M_implicito = None
@@ -158,21 +201,38 @@ class SimulacaoWorker(threading.Thread):
                 self.fila.put(("status", "Fatorando a matriz (LU esparsa, reaproveitada em todos os passos)..."))
                 lu_implicito = sv.fatorar_direto(M_implicito)
 
+        residuo_maximo_observado = 0.0
+
         for n in range(1, n_passos + 1):
             self._checar_cancelamento()
 
             if esquema == "explicito":
-                T = sv.passo_explicito(A, F, dmask, dvals, T, dt, alpha)
+                # M = I (ver discussão): b_passo é exatamente o que passo_explicito
+                # atribui a T_novo -- residuo é por construção ~0 (só ruído de
+                # ponto flutuante), pois não há aproximação alguma na álgebra
+                # (o único erro do explícito é de truncamento no tempo, não
+                # algébrico -- não aparece neste resíduo, ver nota em solver.py)
+                b_passo = T + dt * alpha * (A @ T + F)
+                b_passo[dmask] = dvals[dmask]
+                T_novo = sv.passo_explicito(A, F, dmask, dvals, T, dt, alpha)
+                residuo_passo = (float(np.linalg.norm(T_novo - b_passo)) /
+                                  (float(np.linalg.norm(b_passo)) + 1e-30))
+                T = T_novo
             else:  # implicito
                 b = sv.build_implicit_rhs(F, dmask, dvals, T, dt, alpha)
                 if lu_implicito is not None:
-                    T = sv.resolver_direto_fatorado(lu_implicito, b)
+                    T_novo = sv.resolver_direto_fatorado(lu_implicito, b)
                 else:
                     kwargs = dict(tol=p["tolerancia"], max_iter=p["max_iter"])
                     if p["solver_metodo"] == "sor":
                         kwargs["omega"] = p["omega"]
-                    T, hist_passo, _, _ = sv.resolver(p["solver_metodo"], M_implicito, b, T.copy(), **kwargs)
+                    T_novo, hist_passo, _, _ = sv.resolver(p["solver_metodo"], M_implicito, b,
+                                                            T.copy(), **kwargs)
+                residuo_passo = (float(np.linalg.norm(M_implicito @ T_novo - b)) /
+                                  (float(np.linalg.norm(b)) + 1e-30))
+                T = T_novo
 
+            residuo_maximo_observado = max(residuo_maximo_observado, residuo_passo)
             t += dt
 
             if idx_amostra is not None:
@@ -185,22 +245,21 @@ class SimulacaoWorker(threading.Thread):
                 self.fila.put(("frame_transiente", t, campo))
 
             if n % passo_status == 0 or n == n_passos:
-                # resíduo unificado ||A@T + F|| -- mede a distância do regime
-                # permanente, calculável para QUALQUER esquema (explícito ou
-                # implícito), pois não depende de nenhum solve linear ter sido
-                # feito neste passo especificamente
-                residuo = sv.residuo_pde(A, F, T, norma_ref)
-                self.fila.put(("convergencia_passo", t, max(residuo, 1e-300)))
+                self.fila.put(("convergencia_passo", t, max(residuo_passo, 1e-300)))
                 self.fila.put(("progresso", n / n_passos))
                 self.fila.put(("status", f"Passo {n}/{n_passos}  |  t = {t:.3g} s / {t_final:.3g} s "
-                                          f"({100*n/n_passos:.0f}%)"))
+                                          f"({100*n/n_passos:.0f}%)  |  "
+                                          f"resíduo do balanço = {residuo_passo:.2e}"))
+
+        self.fila.put(("status", f"Concluído. Resíduo MÁXIMO observado em qualquer passo: "
+                                  f"{residuo_maximo_observado:.3e}"))
 
         resultado = {
             "tipo": "transiente",
             "frames": frames,
             "tempos": tempos,
             "T_campo": frames[-1],
-            "tem_residuo": True,  # resíduo unificado agora calculado p/ qualquer esquema
+            "residuo_maximo": residuo_maximo_observado,
         }
         self.fila.put(("progresso", 1.0))
         self.fila.put(("concluido", resultado))
